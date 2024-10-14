@@ -1,0 +1,314 @@
+/*
+
+========================================= Test cours nouvel algo été 2024 =========================
+
+*/
+
+
+
+
+
+
+#include <Adafruit_MCP23X17.h>  //SPI
+#include <Adafruit_MAX31865.h>  //PT100 température
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+
+// CHIP SELECT pour la communication SPI
+#define MODULE_MCP_CS     5  // Module d'entrées/sorties MCP23S17
+//#define MODULE_TEMP_A_CS  2  // Amplificateur de sonde de température PT100 MAX31865
+
+
+Adafruit_MCP23X17 mcp;  //MCP23S17 = GPIO 16 bits expander
+
+// use hardware SPI, just pass in the CS pin
+//Adafruit_MAX31865 thermo = Adafruit_MAX31865(2);
+
+//Pin des sorties liées au MCP
+#define LED_ON 8
+#define LED_DEFAUT 9
+#define LED_MARCHE_MOT_A 10
+#define LED_MARCHE_MOT_B 11
+#define LED_MARCHE_VENTILO 12
+#define LIBRE_1 13
+#define LIBRE_2 14
+#define RELAIS_VENTILO 15
+
+//Pin des boutons liées au MCP
+#define BTN_MARCHE_VENTILO 0
+#define BTN_MODE_VENTILO 1
+#define BTN_PUSH_B_DESC 2
+#define BTN_PUSH_B_MONT 3
+#define BTN_PUSH_A_DESC 4
+#define BTN_PUSH_A_MONT 5
+#define BTN_MODE_MOTEUR 6 //6
+#define BTN_PUSH_ON 7     //7
+#define BTN_ArretUrgence  8                 //TBD correction
+
+#define DIR1 25      //moteur 1, refaire moteur 2
+#define PWM1 26
+
+#define MOTEUR_ARRET 0
+#define MOTEUR_MONTE 1
+#define MOTEUR_DESCEND 2
+
+#define PIN_BTN_ArretUrgence  22                    //TBD correction
+#define MOTEUR_A_FC_BAS         13 // Capteurs de fin de course
+#define MOTEUR_A_FC_HAUT        12
+#define MOTEUR_B_FC_BAS         14
+#define MOTEUR_B_FC_HAUT        27
+
+unsigned long ANTIREBOND =30;
+
+typedef struct T_Bouton {
+  bool etat;
+  bool last_etat;
+  int pin;
+  unsigned long timestamp;
+} T_Bouton;
+
+T_Bouton lBoutons[]=
+  {
+    {false, false, BTN_MARCHE_VENTILO, 0},
+    {false, false, BTN_MODE_VENTILO, 0},
+    {false, false, BTN_PUSH_B_DESC, 0},
+    {false, false, BTN_PUSH_B_MONT, 0},
+    {false, false, BTN_PUSH_A_DESC, 0},
+    {false, false, BTN_PUSH_A_MONT, 0},
+    {false, false, BTN_MODE_MOTEUR, 0},
+    {false, false, BTN_PUSH_ON, 0},
+    {false, false, PIN_BTN_ArretUrgence, 0},    //TBD correction
+  }; 
+
+unsigned long TIMEOUT_MOTEURS = 3000;
+
+bool syst_on = false;
+bool mode_manu = false;
+
+bool mode_moteur_auto = false;
+bool mode_ventilo_auto = false;
+
+bool etatArretUrgence = false;
+bool etatErreurWifi = false;
+bool etatErreurMQTT = false;
+
+//===============================================================================
+//------------------------ Fonctions gestion LEDs  ------------------------------
+//===============================================================================
+
+//-----------------------------------------------------
+/// @brief allume ou eteint la LED
+/// @param numero  numero associcié à pin de LED
+/// @param etat true=allume, false=eteint
+void allumeLED(int numero, bool etat) {
+  mcp.digitalWrite(numero, etat ? HIGH : LOW);
+}
+
+unsigned long timestamp_LED = 0;
+bool etat_LED = false;
+
+#define DUREE_URGENCE_ON 500
+#define DUREE_URGENCE_OFF 500
+
+#define DUREE_WIFI_ON 1000
+#define DUREE_WIFI_OFF 500
+
+#define DUREE_MQTT_ON 500
+#define DUREE_MQTT_OFF 1000
+//-----------------------------------------------------
+/// @brief gere clignotement LED DEFAUT
+/// @param duree_ON tps allumage
+/// @param duree_OFF tps LED eteinte
+void check_LED(int duree_ON, int duree_OFF) {
+  if(!etat_LED) {
+      if(millis()> timestamp_LED + duree_OFF) {
+        allumeLED(LED_DEFAUT, true);
+        etat_LED = true;
+        timestamp_LED = millis();
+      }
+    } else {
+      if(millis()> timestamp_LED + duree_ON) {
+        allumeLED(LED_DEFAUT, false);
+        etat_LED = false;
+        timestamp_LED = millis();
+      }
+    }
+}
+
+/// @brief gère clignotement led en fct de l'ERREUR
+void loop_LEDs() {
+  if(etatArretUrgence) {
+    check_LED(DUREE_URGENCE_ON, DUREE_URGENCE_OFF);   //verifier mise en of du BTN_ON + LED
+    return;
+  }
+  if(etatErreurWifi) {
+    check_LED(DUREE_WIFI_ON, DUREE_WIFI_OFF);
+    Serial.print("erreur wifi");
+    return;
+  } 
+  if(etatErreurMQTT) {
+    check_LED(DUREE_MQTT_ON, DUREE_MQTT_OFF);
+    Serial.print("erreur mqtt");
+    return;
+  }
+  if(etat_LED) {
+    etat_LED = false;                 //si aucune erreur on eteint la LED Defaut
+    allumeLED(LED_DEFAUT, false);
+  }
+}
+
+//===============================================================================
+//------------------------ Fonctions gestion BOUTONS  ---------------------------
+//===============================================================================
+
+/// @brief marche seulement pour les entrées MCP, test état bouton, vérifier qd change s'annule
+/// @param numero 
+/// @return bool
+bool changeEtatBouton(int numero) { //seulement pour boutons du mcp, pas pour bouton arret urgence
+  int etat;
+  etat = !mcp.digitalRead(lBoutons[numero].pin); //TBD vérifier si pull-up/down
+  Serial.print("ETAT MCP : ");
+  Serial.println(etat);
+  //Serial.println(lBoutons[numero].pin);
+
+  int last_etat = lBoutons[numero].last_etat;
+  if(etat == last_etat) {
+    return false;   
+  }
+
+  if(lBoutons[numero].timestamp==0) {
+    lBoutons[numero].timestamp = millis();    //TBD serial.print btn déclanché
+  }
+  if(millis()>lBoutons[numero].timestamp + ANTIREBOND) {      //anti rebond bien dépassé
+    lBoutons[numero].etat = etat;          
+    lBoutons[numero].last_etat = lBoutons[numero].etat;
+    lBoutons[numero].timestamp = 0;
+    Serial.print("numero bouton: ");
+    Serial.println(numero);
+    Serial.print("pin Bouton numero etat apres anti rebond: ");
+    Serial.println(lBoutons[numero].etat);
+
+    return true;
+  }
+  return false;
+}
+
+/// @brief s'active une fois l'antirebond dépassé et bouton push ON
+/// @param numero 
+/// @return bouton pressé ou non
+bool boutonPresse(int numero) {
+  Serial.println(lBoutons[numero].etat);
+  return (changeEtatBouton(numero) && lBoutons[numero].etat); 
+}
+
+/// @brief ne met pas a jour l'état des boutons
+void loop_boutons() {
+  // if(!etatArretUrgence && changeEtatBouton(BTN_ArretUrgence)) { // si arret urgence vient d'etre déclanché //TBD antirebond du btn arret urgence
+  //   etatArretUrgence = true;
+  //   Serial.print("Arret urgence : ");
+  //   Serial.println(syst_on);
+  //   //arretMoteur(0);
+  //   //arretMoteur(1);
+  //                                                         //TBD historiser déclanchement arret d'urgence
+  // }
+  // if(!lBoutons[BTN_ArretUrgence].etat && boutonPresse(BTN_PUSH_ON)) { //si remis en marche après arret urgence    //TBD vérifier
+  //   etatArretUrgence= false;
+  //   Serial.print("Système redemarré : ");
+  //   Serial.println(syst_on);
+  // }
+  // if(etatArretUrgence) {      //si déjà en arret urgence //TBD check si moteurs OFF ?
+  //   Serial.print("arret urgence active : ");
+  //   Serial.println(syst_on);
+  //   return;
+  // }
+  //version test sans MCP
+  if(boutonPresse(BTN_PUSH_ON)) {     //else if ?
+    syst_on = !syst_on;             //avant : syst_on = lBoutons[BTN_PUSH_ON].etat;
+    allumeLED(LED_ON, syst_on);
+    Serial.print("===================================================================================== etat systeme");
+    Serial.println(syst_on);
+    // Serial.print("pin Bouton Push");
+    // Serial.println(lBoutons[BTN_PUSH_ON].etat);
+    // Serial.print("pin Bouton Moteur");
+    // Serial.println(lBoutons[BTN_PUSH_ON].etat);
+  }
+}
+//===============================================================================
+//---------------------------- Fonctions DEBUG  ---------------------------------
+//===============================================================================
+//#define DebugGPIO 1;   //décommenter pour activer la lecture
+//#define DebugCapteursFC 1;
+void debugGPIO() {
+  for(int i=0; i<8; i++) {
+    Serial.print("Etat de la pin : ");
+    Serial.print(i);
+    Serial.print(" --> ");
+     // LOW = pressed, HIGH = not pressed
+    Serial.println(!mcp.digitalRead(i));
+  }
+}
+void debugCapteursFC() {
+  Serial.printf("Etat capteur FC haut moteur A : %d \n", digitalRead(MOTEUR_A_FC_HAUT));
+  Serial.printf("Etat capteur FC bas moteur A : %d \n", digitalRead(MOTEUR_A_FC_BAS));
+  Serial.printf("Etat capteur FC haut moteur B : %d \n", digitalRead(MOTEUR_B_FC_HAUT));
+  Serial.printf("Etat capteur FC bas moteur B : %d \n", digitalRead(MOTEUR_B_FC_BAS));
+
+  delay(500);
+}
+
+void setup() {
+  Serial.begin(115200);
+  // Serial.println("MCP23xxx Blink Test!");
+
+  if (!mcp.begin_SPI(MODULE_MCP_CS)) {
+    Serial.println("Error mcp begin.");
+    while (1);
+  }
+
+  // configure pin for output
+  //mcp.pinMode(LED_PIN, OUTPUT);
+  for (int i = 8; i<16; i++) {    //configure en sortie le registre B
+    mcp.pinMode(i, OUTPUT);                                 //TBD correction
+    mcp.digitalWrite(i, HIGH);    //attention aux sorties MOTEURS ! (B2=10 et B3=11 ?)
+    delay(400);
+    mcp.digitalWrite(i, LOW);   
+  }
+
+  for(int i=0; i<8; i++) {
+    mcp.pinMode(lBoutons[i].pin, INPUT_PULLUP);               //TBD correction
+    Serial.print("Etat de la pin : ");
+    Serial.print(i);
+    Serial.print(" --> ");
+     // LOW = pressed, HIGH = not pressed
+    Serial.println(!mcp.digitalRead(i));
+  }
+  pinMode(lBoutons[BTN_ArretUrgence].pin, INPUT_PULLUP);
+
+  pinMode(MOTEUR_A_FC_BAS, INPUT_PULLDOWN); //car branchement sur 3.3V vers entrée à potentiel flottant
+  pinMode(MOTEUR_A_FC_HAUT, INPUT_PULLDOWN);
+  pinMode(MOTEUR_B_FC_BAS, INPUT_PULLDOWN);
+  pinMode(MOTEUR_B_FC_HAUT, INPUT_PULLDOWN);
+
+  pinMode(DIR1, OUTPUT);
+  pinMode(PWM1, OUTPUT);
+  // Arrête le moteur pendant 1 seconde
+  digitalWrite(DIR1, LOW);
+  digitalWrite(PWM1, LOW);
+
+  //TBD lire valeur des commutateurs de mode
+  //Lecture des valeurs de commutateurs de mode
+
+  Serial.println("Looping...");
+
+}
+
+void loop() {
+    //TBD : mettre a jour etat boutons
+  loop_boutons();
+  #ifdef DebugGPIO
+  debugGPIO();
+  #endif
+}
+
