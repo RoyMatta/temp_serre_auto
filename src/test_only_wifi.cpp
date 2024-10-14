@@ -11,7 +11,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-//Ici
+
 
 //Coordonnees de connexion WIFI
 const char* ssid = "Roy";
