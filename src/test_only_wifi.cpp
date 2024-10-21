@@ -11,7 +11,7 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-//test David commit Github v2 jpex push ? après connection au compte
+
 
 //Coordonnees de connexion WIFI
 const char* ssid = "Roy";
