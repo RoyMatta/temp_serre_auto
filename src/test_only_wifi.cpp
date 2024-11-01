@@ -132,7 +132,7 @@ int rapport_ouverture = 0;
 int ouvrant = 0;
 const int humiditySensorPin = 34;
 int valeurCapteur;
-
+int ventilateur = 0;
 //===============================================================================
 //------------------------ Fonctions gestion LEDs  ------------------------------
 //===============================================================================
@@ -516,15 +516,15 @@ void loop_check_reseau() {                                       //TBD : verifie
       reconnectMQTT();
     } return;
     client.loop();                                //pas sûr d'ici
-    LireTemp();                                   //envoie des données vers server
-    LireHum();
-    EnvoyerTemp();
+    //LireTemp();                                  
+    //LireHum();
+    EnvoyerTemp();                                //envoie des données vers server
     EnvoyerHum();
     if(mode_moteur_auto) {
-        rapport_ouverture = modeAutoMoteurs();    //donne int rapport d'ouverture positive ou negatif
-        if(rapport_ouverture>0) { //TBD changer de place ça dans loop_moteur
-            activeMoteur(0, MOTEUR_MONTE);
-            activeMoteur(1, MOTEUR_MONTE);      //valeur d'arrêt  ajouter rapport_ouverture ds timeout
+        rapport_ouverture = modeAutoMoteurs();       //donne int rapport d'ouverture positive ou negatif
+        if(rapport_ouverture>0) {                   //TBD changer de place ça dans loop_moteur
+            activeMoteur(0, MOTEUR_MONTE);         //TBD de vérifier le pourcentage d'ouverture des moteurs
+            activeMoteur(1, MOTEUR_MONTE);        //valeur d'arrêt  ajouter rapport_ouverture ds timeout
         }
         if(rapport_ouverture<0) {
             activeMoteur(0, MOTEUR_DESCEND);
@@ -589,21 +589,40 @@ void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message: ");
   Serial.println(message);
 
-  //Permet de convertir le message qui est sous format JSON en forme de chaine de caracteres afin de recuperer les valeurs.
-  // Parse JSON message
-  StaticJsonDocument<200> doc; // Adjust the size based on your JSON message
-  DeserializationError error = deserializeJson(doc, message);
-
-  // Check for errors in parsing
-  if (error) {
-    //Serial.print("deserializeJson() failed: ");
-    //Serial.println(error.c_str());
-    return;
+   // Vérifier si le message reçu est celui responsable de la fermeture ou ouverture de la serre.
+  if (strcmp(topic, "/Moteurs/Serre1") == 0) {
+    // Process the message for /Moteurs/Serre1 topic
+    //Permet de convertir le message qui est sous format JSON en forme de chaine de caracteres afin de recuperer les valeurs.
+    // Parse JSON message
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, message);
+    // Check for errors in parsing
+    if (error) {
+      //Serial.print("deserializeJson() failed: ");
+      //Serial.println(error.c_str());
+      return;
+    }
+    // Extract the value of "ouvrant"
+    ouvrant = doc["ouvrant"];
+    Serial.printf("Ouvrant lu ds callback = %d\n", ouvrant);
   }
 
-  // Extract the value of "ouvrant"
-  ouvrant = doc["ouvrant"]; // Assuming "ouvrant" is an integer
-  Serial.printf("Ouvrant lu ds callback = %d\n", ouvrant);
+    // Vérifier si le message reçu est celui responsable de l'activation des ventilateurs.
+  else if (strcmp(topic, "/Ventilateurs/Serre1") == 0) {
+    // Process the message for /Ventilateurs/Serre1 topic
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
+    }
+
+    // Extract the value for ventilateur (assumed key in JSON message)
+    ventilateur = doc["ventilateur"]; 
+    Serial.printf("Ventilateur lu ds callback = %d\n", ventilateur);
+  }
 }
 
 
