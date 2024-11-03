@@ -177,7 +177,7 @@ void check_LED(int duree_ON, int duree_OFF) {
 }
 
 /// @brief gère clignotement led en fct de l'ERREUR
-void loop_LEDs() {
+void loop_LEDs() {leds 
   if(etatArretUrgence) {
     check_LED(DUREE_URGENCE_ON, DUREE_URGENCE_OFF);   //verifier mise en of du BTN_ON + LED
     return;
@@ -504,17 +504,18 @@ void loop_check_reseau() {                                       //TBD : verifie
     if (WiFi.status() != WL_CONNECTED) {           //gere la reconnexion WIFI
       if(!reconnectWiFi()) {
         etatErreurWifi = true;
+        return;
       } else {
         etatErreurWifi = false;
         Serial.println("================== Wifi connecte !==============");
       } 
-      
-    } return;                                     //sûr de mettre le return ?
+    }                                
     Serial.println("Test wifi passe");
     // Check MQTT connection
     if (!client.connected()) {
       reconnectMQTT();
-    } return;
+      return;
+    } 
     client.loop();                                //pas sûr d'ici
     //LireTemp();                                  
     //LireHum();
@@ -543,8 +544,6 @@ void loop_reseau() {
   loop_check_reseau();
 }
 
-
-
 //===============================================================================
 //---------------------------- Fonctions DEBUG  ---------------------------------
 //===============================================================================
@@ -559,15 +558,14 @@ void debugGPIO() {
     Serial.println(!mcp.digitalRead(i));
   }
 }
+
 void debugCapteursFC() {
   Serial.printf("Etat capteur FC haut moteur A : %d \n", digitalRead(MOTEUR_A_FC_HAUT));
   Serial.printf("Etat capteur FC bas moteur A : %d \n", digitalRead(MOTEUR_A_FC_BAS));
   Serial.printf("Etat capteur FC haut moteur B : %d \n", digitalRead(MOTEUR_B_FC_HAUT));
   Serial.printf("Etat capteur FC bas moteur B : %d \n", digitalRead(MOTEUR_B_FC_BAS));
-
   delay(500);
 }
-
 
 
 //===============================================================================
