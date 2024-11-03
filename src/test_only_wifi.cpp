@@ -197,7 +197,7 @@ void check_LED(int duree_ON, int duree_OFF) {
     }
 }
 
-/// @brief gère clignotement led en fct de l'ERREUR
+/// @brief gère clignotement led DEFAUT en fct de l'ERREUR
 void loop_LEDs() {
   //Si on a un arret d'urgence
   if(etatArretUrgence) {
@@ -334,7 +334,7 @@ bool boutonPresse(int numero) {
   return (changeEtatBouton(numero) && lBoutons[numero].etat); 
 }
 
-/// @brief ne met pas a jour l'état des boutons
+/// @brief met a jour l'état des boutons, et detecte les changements d'état, en fonction du type (btn poussoir ou selecteur)
 void loop_boutons() {
 
   if(changeEtatBouton(BTN_ArretUrgence)) { // si arret urgence vient d'etre déclanché //TBD antirebond du btn arret urgence
@@ -568,10 +568,10 @@ void loop_check_reseau() {                                       //TBD : verifie
   }
 }
 
-void loop_reseau() {
-  //client.loop();
-  loop_check_reseau();
-}
+// void loop_reseau() {
+//   //client.loop();
+//   loop_check_reseau();
+// }
 
 //===============================================================================
 //---------------------------- Fonctions DEBUG  ---------------------------------
@@ -717,7 +717,7 @@ void setup() {
     Serial.println(!mcp.digitalRead(i));
   }
   //=============================================================================
-  
+
   pinMode(lBoutons[BTN_ArretUrgence].pin, INPUT_PULLUP);
 
   pinMode(MOTEUR_A_FC_BAS, INPUT_PULLDOWN); //car branchement sur 3.3V vers entrée à potentiel flottant
@@ -742,7 +742,7 @@ void setup() {
 
 void loop() {
   loop_boutons();
-  loop_reseau();
+  loop_check_reseau();
   loop_LEDs();
   loop_moteurs();
   //TBD boucle envoyer param, timestamp
