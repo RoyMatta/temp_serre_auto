@@ -478,6 +478,8 @@ void EnvoyerHum(){
 //===============================================================================
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
+/// @brief met à jour la valeur d'ouverture des volets
+/// @return coefficient d'ouverture, multiplié ensuite par un TIMEOUT
 int modeAutoMoteurs() {
   Serial.println("---MODE AUTOMATIQUE MOTEURS---");
   //delay(100);
@@ -505,7 +507,8 @@ bool reconnectWiFi() {
   return WiFi.status() == WL_CONNECTED;
 }
 
-//Reconnection to MQTT:
+/// @brief Reconnection to MQTT ssi delai dépassé
+/// @return connecté au MQTT ?
 bool reconnectMQTT() {
   if ( millis() > lastMQTTConnexions + TIMEOUT_MAX_CONNECTIONS) {  // Wait 5 seconds before retrying
     // Loop until we're reconnected to MQTT
@@ -526,7 +529,7 @@ bool reconnectMQTT() {
   return client.connected();
 }
 
-/// @brief verifie connexion Wifi + MQTT
+/// @brief verifie connexion Wifi + MQTT ssi systeme allumé et un des mode auto activé (moteur ou ventilo)
 void loop_check_reseau() {                                       //TBD : verifier si bien appelé
   if(syst_on && (mode_ventilo_auto || mode_moteur_auto)) {      //ssi bloc en marche et un des modes en auto
     if (WiFi.status() != WL_CONNECTED) {           //gere la reconnexion WIFI
@@ -652,10 +655,10 @@ void callback(char* topic, byte* payload, unsigned int length) {
 //===============================================================================
 //--------------------------------- SETUP --------------------------------------- 
 //===============================================================================
-
 void setup() {
   Serial.begin(115200);
-//============= Partie MQTT ======================
+  
+  //============================= Partie MQTT ===================================
   WiFi.begin(ssid, password); //Connexion au WIFI
   thermo.begin(MAX31865_3WIRE);
   //Si connexion WIFI echoué 
@@ -687,7 +690,9 @@ void setup() {
       delay(2000);
     }
   }
-  //================================================
+  //=============================================================================
+
+  //=================== Initialisation Expander MCP23S17 ========================
   Serial.println("MCP23xxx Blink Test!");
   if (!mcp.begin_SPI(MODULE_MCP_CS)) {
     Serial.println("Error mcp begin.");
@@ -711,6 +716,8 @@ void setup() {
      // LOW = pressed, HIGH = not pressed
     Serial.println(!mcp.digitalRead(i));
   }
+  //=============================================================================
+  
   pinMode(lBoutons[BTN_ArretUrgence].pin, INPUT_PULLUP);
 
   pinMode(MOTEUR_A_FC_BAS, INPUT_PULLDOWN); //car branchement sur 3.3V vers entrée à potentiel flottant
