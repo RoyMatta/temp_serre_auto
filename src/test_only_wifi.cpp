@@ -11,17 +11,15 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 
-//Roypazksa
-
-//Coordonnees de connexion WIFI
+//Coordonnées de connexion WIFI
 const char* ssid = "Roy";
 const char* password = "roymatta234567";
 
 //Coordonnees de connexion MQTT
 const char* mqttServer = "109.14.127.184";
 const int mqttPort = 1883;
-const char* mqttUsername = "mqtt-user"; // Replace with your MQTT username
-const char* mqttPassword = "mqtt-password"; // Replace with your MQTT password
+const char* mqttUsername = "mqtt-user"; // Remplacer avec le nom d'utilisateur MQTT. 
+const char* mqttPassword = "mqtt-password"; // Remplacer avec le mot de passe MQTT.
 
 WiFiClient espClient; //Nous declarons l'esp comme un client du reseau WIFI
 PubSubClient client(espClient); //Nous declarons l'esp comme un client du reseau MQTT
@@ -59,80 +57,103 @@ Adafruit_MCP23X17 mcp;  //MCP23S17 = GPIO 16 bits expander
 #define BTN_PUSH_ON 7     //7
 #define BTN_ArretUrgence  8                 //TBD correction
 
-#define DIR1 25      //moteur 1, refaire moteur 2
+#define DIR1 25      //moteur 1
 #define PWM1 26
 
-#define MOTEUR_ARRET 0
-#define MOTEUR_MONTE 1
-#define MOTEUR_DESCEND 2
+#define DIR2 27      //moteur 2 à vérifier les pins
+#define PWM2 28
+
+#define MOTEUR_ARRET 0 //Variable pour arreter le moteur
+#define MOTEUR_MONTE 1 //Variable pour ouvrir la serre
+#define MOTEUR_DESCEND 2 //Variable pour fermer la serre
 
 #define PIN_BTN_ArretUrgence  22                    //TBD correction
-#define MOTEUR_A_FC_BAS         13 // Capteurs de fin de course
+// Capteurs de fin de cours
+#define MOTEUR_A_FC_BAS         13 
 #define MOTEUR_A_FC_HAUT        12
 #define MOTEUR_B_FC_BAS         14
 #define MOTEUR_B_FC_HAUT        27
 
-unsigned long ANTIREBOND =30;
+unsigned long ANTIREBOND =30; //Variable pour l'anti-rebond
 
+//Définition de la structure du moteur
 typedef struct T_Moteur {
-  int pwm;  //différence avec état
-  int dir;
-  int etat;     //actif ou pas 
-  unsigned long timestamp;
-  int capteur_FC_haut;
-  int capteur_FC_bas;
-  int pin_LED_temoin;
+  int pwm;    //pin responsable du pwm
+  int dir;    //pin responsable de la direction du moteur
+  int etat;    //valuer qui indique l'état du moteur
+  unsigned long timestamp; //timestamp responsable de la durée de marche du moteur
+  int capteur_FC_haut;  //capteur de fin de course haut
+  int capteur_FC_bas;  //capteur de fin de course bas
+  int pin_LED_temoin;  //Led qui indique l'état du moteur s'il est en marche ou arret
 } T_Moteur ;
 
 T_Moteur lMoteurs[]= 
   {
-     { PWM1, DIR1, MOTEUR_ARRET, 0, MOTEUR_A_FC_HAUT, MOTEUR_A_FC_BAS, LED_MARCHE_MOT_A},
-     { PWM1, DIR1, MOTEUR_ARRET, 0, MOTEUR_B_FC_HAUT, MOTEUR_B_FC_BAS, LED_MARCHE_MOT_B}
+     { PWM1, DIR1, MOTEUR_ARRET, 0, MOTEUR_A_FC_HAUT, MOTEUR_A_FC_BAS, LED_MARCHE_MOT_A}, //Moteur 1
+     { PWM2, DIR2, MOTEUR_ARRET, 0, MOTEUR_B_FC_HAUT, MOTEUR_B_FC_BAS, LED_MARCHE_MOT_B} //Moteur 2
   };
 
+//Définition de la structure du bouton
 typedef struct T_Bouton {
-  bool etat;
-  bool last_etat;
-  int pin;
-  unsigned long timestamp;
+  bool etat; //etat du bouton actuel si actif ou pas à l'instant n
+  bool last_etat; //etat précedent du bouton à l'instant n-1
+  int pin; //pin du  bouton sur l'esp
+  unsigned long timestamp; //timestamp responsable de l'anti-rebond
 } T_Bouton;
 
 T_Bouton lBoutons[]=
   {
-    {false, false, BTN_MARCHE_VENTILO, 0},
-    {false, false, BTN_MODE_VENTILO, 0},
-    {false, false, BTN_PUSH_B_DESC, 0},
-    {false, false, BTN_PUSH_B_MONT, 0},
-    {false, false, BTN_PUSH_A_DESC, 0},
-    {false, false, BTN_PUSH_A_MONT, 0},
-    {false, false, BTN_MODE_MOTEUR, 0},
-    {false, false, BTN_PUSH_ON, 0},
-    {false, false, PIN_BTN_ArretUrgence, 0},    //TBD correction
+    {false, false, BTN_MARCHE_VENTILO, 0}, //Bouton de marche des ventilateurs
+    {false, false, BTN_MODE_VENTILO, 0}, //Bouton mode automatique ou manuel des ventilateurs
+    {false, false, BTN_PUSH_B_DESC, 0}, //Bouton de descente du moteur B
+    {false, false, BTN_PUSH_B_MONT, 0}, //Bouton de montée du moteur B
+    {false, false, BTN_PUSH_A_DESC, 0}, //Bouton de descente edu moteur A
+    {false, false, BTN_PUSH_A_MONT, 0}, //Bouton de montée du moteur A
+    {false, false, BTN_MODE_MOTEUR, 0}, //Bouton mode automatique ou manuel des moteurs
+    {false, false, BTN_PUSH_ON, 0}, //Bouton de système pour le mettre actif
+    {false, false, PIN_BTN_ArretUrgence, 0},    //Bouton arret d'urgence //TBD correction
   }; 
 
-unsigned long TIMEOUT_MOTEURS = 3000;
+unsigned long TIMEOUT_MOTEURS = 3000; //Durée de fonctionnement d'un cycle du moteur
 
-bool syst_on = false;
-bool mode_manu = false;
+bool syst_on = false; //booléen responsable de l'activation du système
+bool mode_manu = false; //booléen responsable de l'activation du mode manuel du système
 
-bool mode_moteur_auto = false;
-bool mode_ventilo_auto = false;
+bool mode_moteur_auto = false;  //booléen responsable de l'activation du mode automatique des moteurs
+bool mode_ventilo_auto = false; //booléen responsable de l'activation du mode automatique des ventilateurs
 
-bool etatArretUrgence = false;
-bool etatErreurWifi = false;
-bool etatErreurMQTT = false;
-
-//Pour le capteur d'humidité
+bool etatArretUrgence = false; //booléen responsable de l'état du bouton de l'arret d'urgence
+bool etatErreurWifi = false;   //booléen responsable de l'erreur WiFi
+bool etatErreurMQTT = false;   //booléen responsable de l'erreur MQTT
 
 
-int ancien_ouvrant = 0;
-int action_ouvrant = 0;
-int difference = 0;
+int ancien_ouvrant = 0; //valeur de réferenece qui va servir pour comparer de combien il faut ouvrir ou fermer la serre à l'instant n-1
+int action_ouvrant = 0; //valeur de combien il faut ouvrir ou fermer à l'instant n
+int difference = 0; //différence entre les 2 valeurs pour determiner de combien on ouvre ou on ferme la serre
 int rapport_ouverture = 0;
-int ouvrant = 0;
-const int humiditySensorPin = 34;
-int valeurCapteur;
-int ventilateur = 0;
+int ouvrant = 0; 
+const int humiditySensorPin = 34; //Pin du capteur d'humidité
+int valeurCapteur; //valeur de l'humidité donnée par le capteur
+int ventilateur = 0; //valeur responsable de l'activation des ventilateurs
+
+//Pour le capteur de température
+// Use software SPI: CS, DI, DO, CLK
+Adafruit_MAX31865 thermo = Adafruit_MAX31865(5, 23, 19, 18);
+// use hardware SPI, just pass in the CS pin
+//Adafruit_MAX31865 max = Adafruit_MAX31865(10);
+
+// The value of the Rref resistor. Use 430.0 for PT100 and 4300.0 for PT1000
+#define RREF      430.0
+// The 'nominal' 0-degrees-C resistance of the sensor
+// 100.0 for PT100, 1000.0 for PT1000
+#define RNOMINAL  100.0
+
+#define WINDOW_SIZE 128
+int16_t results[WINDOW_SIZE] = {0};
+int current_result = 0;
+
+volatile float Temperature;
+
 //===============================================================================
 //------------------------ Fonctions gestion LEDs  ------------------------------
 //===============================================================================
@@ -177,16 +198,19 @@ void check_LED(int duree_ON, int duree_OFF) {
 }
 
 /// @brief gère clignotement led en fct de l'ERREUR
-void loop_LEDs() {leds 
+void loop_LEDs() {
+  //Si on a un arret d'urgence
   if(etatArretUrgence) {
     check_LED(DUREE_URGENCE_ON, DUREE_URGENCE_OFF);   //verifier mise en of du BTN_ON + LED
     return;
   }
+  //Si on a une erreur de connexion Wifi
   if(etatErreurWifi) {
     check_LED(DUREE_WIFI_ON, DUREE_WIFI_OFF);
     Serial.print("erreur wifi");
     return;
   } 
+  //Si on a une erreur de connexion MQTT
   if(etatErreurMQTT) {
     check_LED(DUREE_MQTT_ON, DUREE_MQTT_OFF);
     Serial.print("erreur mqtt");
@@ -213,7 +237,7 @@ void arretMoteur(int numero) {
   lMoteurs[numero].etat = MOTEUR_ARRET;
   allumeLED(lMoteurs[numero].pin_LED_temoin, false);
 }
-/// @brief active la montée ou descente de mot 0 ou 1
+/// @brief active la montée ou descente du moteur 0 ou 1
 /// @param numero 
 /// @param etat 
 void activeMoteur(int numero, int etat) { //demarrage du moteur
@@ -256,6 +280,7 @@ void check_moteur(int numero) {   //TBD ajouter variation d'un timeout pour mode
     arretMoteur(numero);
   }
 }
+//boucle moteur qui est responsable d'éteindre les moteurs si une condition est vérifiée
 void loop_moteurs() {
   check_moteur(0);    //avec timeout
   check_moteur(1);
@@ -269,7 +294,7 @@ void loop_moteurs() {
 /// @brief marche seulement pour les entrées MCP, test état bouton, vérifier qd change s'annule
 /// @param numero 
 /// @return bool
-bool changeEtatBouton(int numero) { //seulement pour boutons du mcp, pas pour bouton arret urgence
+bool changeEtatBouton(int numero) { 
   int etat;
   if(numero == BTN_ArretUrgence) {
     etat = !digitalRead(lBoutons[numero].pin); //TBD vérifier si pull-up/down
@@ -394,7 +419,10 @@ void loop_boutons() {
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //Capteur de temperature
 float LireTemp(){
-  return 25.5; //example
+ uint16_t rtd = thermo.readRTD();
+  Temperature = (thermo.temperature(RNOMINAL, RREF));
+  Temperature = (Temperature - 1.52);
+  return Temperature; 
 }
 
 void EnvoyerTemp(){
@@ -517,8 +545,6 @@ void loop_check_reseau() {                                       //TBD : verifie
       return;
     } 
     client.loop();                                //pas sûr d'ici
-    //LireTemp();                                  
-    //LireHum();
     EnvoyerTemp();                                //envoie des données vers server
     EnvoyerHum();
     if(mode_moteur_auto) {
@@ -623,8 +649,6 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
 }
 
-
-
 //===============================================================================
 //--------------------------------- SETUP --------------------------------------- 
 //===============================================================================
@@ -633,8 +657,8 @@ void setup() {
   Serial.begin(115200);
 //============= Partie MQTT ======================
   WiFi.begin(ssid, password); //Connexion au WIFI
-
-  //Si connexion WIFI echoue 
+  thermo.begin(MAX31865_3WIRE);
+  //Si connexion WIFI echoué 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.println("Connecting to WiFi..");
@@ -696,23 +720,25 @@ void setup() {
 
   pinMode(DIR1, OUTPUT);
   pinMode(PWM1, OUTPUT);
+  pinMode(DIR2, OUTPUT);
+  pinMode(PWM2, OUTPUT);
   // Arrête le moteur pendant 1 seconde
   digitalWrite(DIR1, LOW);
   digitalWrite(PWM1, LOW);
-
+  digitalWrite(DIR2, LOW);
+  digitalWrite(PWM2, LOW);
   //TBD lire valeur des commutateurs de mode
   //Lecture des valeurs de commutateurs de mode
-
   Serial.println("Looping...");
 
 }
 
 void loop() {
-  //loop_boutons();
+  loop_boutons();
   loop_reseau();
-  // loop_LEDs();
-  // loop_moteurs();
-                        //TBD boucle envoyer param, timestamp
+  loop_LEDs();
+  loop_moteurs();
+  //TBD boucle envoyer param, timestamp
 
   #ifdef DebugGPIO
   debugGPIO();
