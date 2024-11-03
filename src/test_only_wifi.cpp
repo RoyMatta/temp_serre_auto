@@ -10,6 +10,7 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+#include "test_only_wifi.h"
 
 //Coordonnées de connexion WIFI
 const char* ssid = "Roy";
@@ -446,6 +447,8 @@ void EnvoyerTemp(){
 //----------------------- Capteur de humidite ---------------------------
 //===============================================================================
 
+/// @brief mesure le potentiel: valeur d'humidité
+/// @return renvoie valeurCapteur, l'humidité en analogique (0 to 1024)
 float LireHum() {
 
   // Lecture de la valeur du capteur
@@ -457,6 +460,7 @@ float LireHum() {
   delay(1000);
 }
 
+/// @brief ajoute sur le serveur MQTT la valeur d'humidité
 void EnvoyerHum(){
   float humidite = LireHum();
     // Create a JSON object and populate it
@@ -603,7 +607,7 @@ void debugCapteursFC() {
 
 // Callback function that is called when a new message arrives at the subscribed topic
 
-// Callback: fonction appellee lors de la reception d'un message(commande des moteurs ou ventilateurs) pour traiter le message recu.
+/// @brief Callback: fonction appellee lors de la reception d'un message(commande des moteurs ou ventilateurs) pour traiter le message recu.
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived in topic: ");
   Serial.println(topic); //affichage du topic dans lequel on a recu le message
