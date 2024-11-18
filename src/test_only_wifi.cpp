@@ -15,7 +15,7 @@
 const char* ssid = "Roy";
 const char* password = "roymatta234567";
 
-//Coordonnees de connexion MQTT
+//Coordonnées de connexion MQTT
 const char* mqttServer = "109.14.127.184";
 const int mqttPort = 1883;
 const char* mqttUsername = "mqtt-user"; // Remplacer avec le nom d'utilisateur MQTT. 
