@@ -210,6 +210,7 @@ void loop_LEDs() {
     check_LED(DUREE_URGENCE_ON, DUREE_URGENCE_OFF);   //verifier mise en of du BTN_ON + LED
     return;
   }
+  if(syst_on && (mode_moteur_auto||mode_ventilo_auto)){
   //Si on a une erreur de connexion Wifi
   if(etatErreurWifi) {
     check_LED(DUREE_WIFI_ON, DUREE_WIFI_OFF);
@@ -221,6 +222,7 @@ void loop_LEDs() {
     check_LED(DUREE_MQTT_ON, DUREE_MQTT_OFF);
     Serial.print("erreur mqtt");
     return;
+  }
   }
   if(etat_LED) {
     etat_LED = false;                 //si aucune erreur on eteint la LED Defaut
