@@ -15,7 +15,7 @@
 const char* ssid = "Roy";
 const char* password = "roymatta234567";
 
-//Coordonnees de connexion MQTT
+//Coordonnées de connexion MQTT
 const char* mqttServer = "109.14.127.184";
 const int mqttPort = 1883;
 const char* mqttUsername = "mqtt-user"; // Remplacer avec le nom d'utilisateur MQTT. 
@@ -27,7 +27,7 @@ PubSubClient client(espClient); //Nous declarons l'esp comme un client du reseau
 
 
 // CHIP SELECT pour la communication SPI
-#define MODULE_MCP_CS     5  // Module d'entrées/sorties MCP23S17
+#define MODULE_MCP_CS    5  // Module d'entrées/sorties MCP23S17
 //#define MODULE_TEMP_A_CS  2  // Amplificateur de sonde de température PT100 MAX31865
 
 
@@ -599,8 +599,8 @@ void loop_check_reseau() {                                       //TBD : verifie
 //===============================================================================
 //---------------------------- Fonctions DEBUG  ---------------------------------
 //===============================================================================
-//#define DebugGPIO 1;   //décommenter pour activer la lecture
-//#define DebugCapteursFC 1;
+#define DebugGPIO 1;   //décommenter pour activer la lecture
+#define DebugCapteursFC 1;
 void debugGPIO() {
   for(int i=0; i<8; i++) {
     Serial.print("Etat de la pin : ");
@@ -766,10 +766,10 @@ void setup() {
 }
 
 void loop() {
-  loop_boutons();
-  loop_check_reseau();
-  loop_LEDs();
-  loop_moteurs();
+  // loop_boutons();
+  // loop_check_reseau();
+  // loop_LEDs();
+  // loop_moteurs();
   //TBD boucle envoyer param, timestamp
 
   #ifdef DebugGPIO
