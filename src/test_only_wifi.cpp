@@ -409,7 +409,6 @@ void loop_boutons() {
     }
     if(!mode_ventilo_auto) {
       if(changeEtatBouton(BTN_MARCHE_VENTILO)) {        //en mode manuel, active le ventilo en fonction du selecteur BTN_MARCHE_VENTILO
-
         activeVentilo(lBoutons[BTN_MARCHE_VENTILO].etat);
       }
     }
@@ -439,9 +438,10 @@ void loop_boutons() {
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //Capteur de temperature
 float LireTemp(){
- uint16_t rtd = thermo.readRTD();
-  Temperature = (thermo.temperature(RNOMINAL, RREF));
-  Temperature = (Temperature - 1.52);
+//  uint16_t rtd = thermo.readRTD();
+//   Temperature = (thermo.temperature(RNOMINAL, RREF));
+//   Temperature = (Temperature - 1.52);
+  Temperature = 24; //Forcer temp à 24 degrés
   return Temperature; 
 }
 
@@ -469,14 +469,14 @@ void EnvoyerTemp(){
 /// @brief mesure le potentiel: valeur d'humidité
 /// @return renvoie valeurCapteur, l'humidité en analogique (0 to 1024)
 float LireHum() {
-
+  valeurCapteur = 60; //Forcer l'humidité à 60
   // Lecture de la valeur du capteur
-  valeurCapteur = analogRead(humiditySensorPin);
-  Serial.print("Valeur humidity : ");
-  Serial.println(valeurCapteur);
+  // valeurCapteur = analogRead(humiditySensorPin);
+  // Serial.print("Valeur humidity : ");
+  // Serial.println(valeurCapteur);
   return valeurCapteur;
   // Ajout d'un léger délai pour éviter les lectures trop rapides
-  delay(1000);
+  //delay(1000);
 }
 
 /// @brief ajoute sur le serveur MQTT la valeur d'humidité
