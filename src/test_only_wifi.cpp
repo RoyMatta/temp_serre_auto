@@ -210,7 +210,6 @@ void loop_LEDs() {
     check_LED(DUREE_URGENCE_ON, DUREE_URGENCE_OFF);   //verifier mise en of du BTN_ON + LED
     return;
   }
-  if(syst_on && (mode_moteur_auto||mode_ventilo_auto)){
   //Si on a une erreur de connexion Wifi
   if(etatErreurWifi) {
     check_LED(DUREE_WIFI_ON, DUREE_WIFI_OFF);
@@ -222,7 +221,6 @@ void loop_LEDs() {
     check_LED(DUREE_MQTT_ON, DUREE_MQTT_OFF);
     Serial.print("erreur mqtt");
     return;
-  }
   }
   if(etat_LED) {
     etat_LED = false;                 //si aucune erreur on eteint la LED Defaut
@@ -567,11 +565,18 @@ void loop_check_reseau() {                                       //TBD : verifie
       } 
     }                                
     Serial.println("Test wifi passe");
+
     // Check MQTT connection
     if (!client.connected()) {
-      reconnectMQTT();
-      return;
+     if(!reconnectMQTT()){
+        etatErreurMQTT = true;
+        return;
+      }else{
+        etatErreurMQTT = false;
+        Serial.println("================== MQTT connecte !==============");
+      }
     } 
+    Serial.println("Test MQTT passe");
     client.loop();                                //pas sûr d'ici
     EnvoyerTemp();                                //envoie des données vers server
     EnvoyerHum();
@@ -590,6 +595,10 @@ void loop_check_reseau() {                                       //TBD : verifie
     if(mode_ventilo_auto) {
         //TBD activation ou non tout ou rien
     }
+  }
+  else{
+    etatErreurWifi = false;
+    etatErreurMQTT = false;
   }
 }
 
