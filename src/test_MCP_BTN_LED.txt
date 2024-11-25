@@ -1,0 +1,298 @@
+/*
+
+========================================= Test cours nouvel algo été 2024 =========================
+
+*/
+
+#include <Adafruit_MCP23X17.h>  //SPI
+#include <Adafruit_MAX31865.h>  //PT100 température
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+
+//Coordonnées de connexion WIFI
+const char* ssid = "Roy";
+const char* password = "roymatta234567";
+
+//Coordonnees de connexion MQTT
+const char* mqttServer = "109.14.127.184";
+const int mqttPort = 1883;
+const char* mqttUsername = "mqtt-user"; // Remplacer avec le nom d'utilisateur MQTT. 
+const char* mqttPassword = "mqtt-password"; // Remplacer avec le mot de passe MQTT.
+
+WiFiClient espClient; //Nous declarons l'esp comme un client du reseau WIFI
+PubSubClient client(espClient); //Nous declarons l'esp comme un client du reseau MQTT
+
+
+
+// CHIP SELECT pour la communication SPI
+#define MODULE_MCP_CS     5  // Module d'entrées/sorties MCP23S17
+//#define MODULE_TEMP_A_CS  2  // Amplificateur de sonde de température PT100 MAX31865
+
+
+Adafruit_MCP23X17 mcp;  //MCP23S17 = GPIO 16 bits expander
+
+// use hardware SPI, just pass in the CS pin
+//Adafruit_MAX31865 thermo = Adafruit_MAX31865(2);
+
+//Pin des sorties liées au MCP
+#define LED_ON 8
+#define LED_DEFAUT 9
+#define LED_MARCHE_MOT_A 10
+#define LED_MARCHE_MOT_B 11
+#define LED_MARCHE_VENTILO 12
+#define LIBRE_1 13
+#define LIBRE_2 14
+#define RELAIS_VENTILO 15
+
+//Pin des boutons liées au MCP
+#define BTN_MARCHE_VENTILO 0
+#define BTN_MODE_VENTILO 1
+#define BTN_PUSH_B_DESC 2
+#define BTN_PUSH_B_MONT 3
+#define BTN_PUSH_A_DESC 4
+#define BTN_PUSH_A_MONT 5
+#define BTN_MODE_MOTEUR 6 //6
+#define BTN_PUSH_ON 7     //7
+#define BTN_ArretUrgence  8                 //TBD correction
+
+#define DIR1 25      //moteur 1
+#define PWM1 26
+
+#define DIR2 27      //moteur 2 à vérifier les pins
+#define PWM2 28
+
+#define MOTEUR_ARRET 0 //Variable pour arreter le moteur
+#define MOTEUR_MONTE 1 //Variable pour ouvrir la serre
+#define MOTEUR_DESCEND 2 //Variable pour fermer la serre
+
+#define PIN_BTN_ArretUrgence  22                    //TBD correction
+// Capteurs de fin de cours
+#define MOTEUR_A_FC_BAS         13 
+#define MOTEUR_A_FC_HAUT        12
+#define MOTEUR_B_FC_BAS         14
+#define MOTEUR_B_FC_HAUT        27
+
+unsigned long ANTIREBOND =30; //Variable pour l'anti-rebond
+
+//Définition de la structure du moteur
+typedef struct T_Moteur {
+  int pwm;    //pin responsable du pwm
+  int dir;    //pin responsable de la direction du moteur
+  int etat;    //valuer qui indique l'état du moteur
+  unsigned long timestamp; //timestamp responsable de la durée de marche du moteur
+  int capteur_FC_haut;  //capteur de fin de course haut
+  int capteur_FC_bas;  //capteur de fin de course bas
+  int pin_LED_temoin;  //Led qui indique l'état du moteur s'il est en marche ou arret
+} T_Moteur ;
+
+T_Moteur lMoteurs[]= 
+  {
+     { PWM1, DIR1, MOTEUR_ARRET, 0, MOTEUR_A_FC_HAUT, MOTEUR_A_FC_BAS, LED_MARCHE_MOT_A}, //Moteur 1
+     { PWM2, DIR2, MOTEUR_ARRET, 0, MOTEUR_B_FC_HAUT, MOTEUR_B_FC_BAS, LED_MARCHE_MOT_B} //Moteur 2
+  };
+
+//Définition de la structure du bouton
+typedef struct T_Bouton {
+  bool etat; //etat du bouton actuel si actif ou pas à l'instant n
+  bool last_etat; //etat précedent du bouton à l'instant n-1
+  int pin; //pin du  bouton sur l'esp
+  unsigned long timestamp; //timestamp responsable de l'anti-rebond
+} T_Bouton;
+
+T_Bouton lBoutons[]=
+  {
+    {false, false, BTN_MARCHE_VENTILO, 0}, //Bouton de marche des ventilateurs
+    {false, false, BTN_MODE_VENTILO, 0}, //Bouton mode automatique ou manuel des ventilateurs
+    {false, false, BTN_PUSH_B_DESC, 0}, //Bouton de descente du moteur B
+    {false, false, BTN_PUSH_B_MONT, 0}, //Bouton de montée du moteur B
+    {false, false, BTN_PUSH_A_DESC, 0}, //Bouton de descente edu moteur A
+    {false, false, BTN_PUSH_A_MONT, 0}, //Bouton de montée du moteur A
+    {false, false, BTN_MODE_MOTEUR, 0}, //Bouton mode automatique ou manuel des moteurs
+    {false, false, BTN_PUSH_ON, 0}, //Bouton de système pour le mettre actif
+    {false, false, PIN_BTN_ArretUrgence, 0},    //Bouton arret d'urgence //TBD correction
+  }; 
+
+unsigned long TIMEOUT_MOTEURS = 3000; //Durée de fonctionnement d'un cycle du moteur
+
+bool syst_on = false; //booléen responsable de l'activation du système
+bool mode_manu = false; //booléen responsable de l'activation du mode manuel du système
+
+bool mode_moteur_auto = false;  //booléen responsable de l'activation du mode automatique des moteurs
+bool mode_ventilo_auto = false; //booléen responsable de l'activation du mode automatique des ventilateurs
+
+bool etatArretUrgence = false; //booléen responsable de l'état du bouton de l'arret d'urgence
+bool etatErreurWifi = false;   //booléen responsable de l'erreur WiFi
+bool etatErreurMQTT = false;   //booléen responsable de l'erreur MQTT
+
+
+int ancien_ouvrant = 0; //valeur de réferenece qui va servir pour comparer de combien il faut ouvrir ou fermer la serre à l'instant n-1
+int action_ouvrant = 0; //valeur de combien il faut ouvrir ou fermer à l'instant n
+int difference = 0; //différence entre les 2 valeurs pour determiner de combien on ouvre ou on ferme la serre
+int rapport_ouverture = 0;
+int ouvrant = 0; 
+const int humiditySensorPin = 34; //Pin du capteur d'humidité
+int valeurCapteur; //valeur de l'humidité donnée par le capteur
+int ventilateur = 0; //valeur responsable de l'activation des ventilateurs
+
+//Pour le capteur de température
+// Use software SPI: CS, DI, DO, CLK
+Adafruit_MAX31865 thermo = Adafruit_MAX31865(5, 23, 19, 18);
+// use hardware SPI, just pass in the CS pin
+//Adafruit_MAX31865 max = Adafruit_MAX31865(10);
+
+// The value of the Rref resistor. Use 430.0 for PT100 and 4300.0 for PT1000
+#define RREF      430.0
+// The 'nominal' 0-degrees-C resistance of the sensor
+// 100.0 for PT100, 1000.0 for PT1000
+#define RNOMINAL  100.0
+
+#define WINDOW_SIZE 128
+int16_t results[WINDOW_SIZE] = {0};
+int current_result = 0;
+
+volatile float Temperature;
+
+
+
+
+//===============================================================================
+//---------------------------- Fonctions DEBUG  ---------------------------------
+//===============================================================================
+#define DebugGPIO 1;   //décommenter pour activer la lecture
+//#define DebugCapteursFC 1;
+void debugGPIO() {
+  for(int i=0; i<8; i++) {
+    Serial.print("Etat de la pin : ");
+    Serial.print(i);
+    Serial.print(" --> ");
+     // LOW = pressed, HIGH = not pressed
+    Serial.println(!mcp.digitalRead(i));
+  }
+}
+
+void debugCapteursFC() {
+  Serial.printf("Etat capteur FC haut moteur A : %d \n", digitalRead(MOTEUR_A_FC_HAUT));
+  Serial.printf("Etat capteur FC bas moteur A : %d \n", digitalRead(MOTEUR_A_FC_BAS));
+  Serial.printf("Etat capteur FC haut moteur B : %d \n", digitalRead(MOTEUR_B_FC_HAUT));
+  Serial.printf("Etat capteur FC bas moteur B : %d \n", digitalRead(MOTEUR_B_FC_BAS));
+  delay(500);
+}
+
+
+//===============================================================================
+//--------------------------------- CALLBACK --------------------------------------- 
+//===============================================================================
+
+// Callback function that is called when a new message arrives at the subscribed topic
+
+/// @brief Callback: fonction appellee lors de la reception d'un message(commande des moteurs ou ventilateurs) pour traiter le message recu.
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic); //affichage du topic dans lequel on a recu le message
+  
+  // Convertir le message en chaine de caracteres
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.print("Message: ");
+  Serial.println(message);
+
+   // Vérifier si le message reçu est celui responsable de la fermeture ou ouverture de la serre.
+  if (strcmp(topic, "/Moteurs/Serre1") == 0) {
+    // Process the message for /Moteurs/Serre1 topic
+    //Permet de convertir le message qui est sous format JSON en forme de chaine de caracteres afin de recuperer les valeurs.
+    // Parse JSON message
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, message);
+    // Check for errors in parsing
+    if (error) {
+      //Serial.print("deserializeJson() failed: ");
+      //Serial.println(error.c_str());
+      return;
+    }
+    // Extract the value of "ouvrant"
+    ouvrant = doc["ouvrant"];
+    Serial.printf("Ouvrant lu ds callback = %d\n", ouvrant);
+  }
+
+    // Vérifier si le message reçu est celui responsable de l'activation des ventilateurs.
+  else if (strcmp(topic, "/Ventilateurs/Serre1") == 0) {
+    // Process the message for /Ventilateurs/Serre1 topic
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
+    }
+
+    // Extract the value for ventilateur (assumed key in JSON message)
+    ventilateur = doc["ventilateur"]; 
+    Serial.printf("Ventilateur lu ds callback = %d\n", ventilateur);
+  }
+}
+
+//===============================================================================
+//--------------------------------- SETUP --------------------------------------- 
+//===============================================================================
+void setup() {
+  Serial.begin(115200);
+  
+  //=============================================================================
+
+  //=================== Initialisation Expander MCP23S17 ========================
+  Serial.println("MCP23xxx Blink Test!");
+  if (!mcp.begin_SPI(MODULE_MCP_CS)) {
+    Serial.println("Error mcp begin.");
+    while (1);
+  }
+
+  // configure pin for output
+  //mcp.pinMode(LED_PIN, OUTPUT);
+  for (int i = 8; i<16; i++) {    //configure en sortie le registre B
+    mcp.pinMode(i, OUTPUT);                                 //TBD correction
+    mcp.digitalWrite(i, HIGH);    //attention aux sorties MOTEURS ! (B2=10 et B3=11 ?)
+    delay(400);
+    mcp.digitalWrite(i, LOW);   
+  }
+
+  for(int i=0; i<8; i++) {
+    mcp.pinMode(lBoutons[i].pin, INPUT_PULLUP);               //TBD correction
+    Serial.print("Etat de la pin : ");
+    Serial.print(i);
+    Serial.print(" --> ");
+     // LOW = pressed, HIGH = not pressed
+    Serial.println(!mcp.digitalRead(i));
+  }
+  //=============================================================================
+
+  //TBD lire valeur des commutateurs de mode
+  //Lecture des valeurs de commutateurs de mode
+  Serial.println("Looping...");
+
+}
+
+void loop() {
+
+  //TBD boucle envoyer param, timestamp
+  if (mcp.digitalRead(0) == 0) {
+    mcp.digitalWrite(8, LOW);
+    mcp.digitalWrite(9, HIGH);
+  }
+  else {
+    mcp.digitalWrite(8, HIGH);
+    mcp.digitalWrite(9, LOW);
+  }
+
+  #ifdef DebugGPIO
+  debugGPIO();
+  #endif
+
+  #ifdef DebugCapteursFC
+  debugCapteursFC();
+  #endif
+}

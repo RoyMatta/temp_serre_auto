@@ -10,7 +10,6 @@
 #include <WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include "test_only_wifi.h"
 
 //Coordonnées de connexion WIFI
 const char* ssid = "Roy";
@@ -61,8 +60,8 @@ Adafruit_MCP23X17 mcp;  //MCP23S17 = GPIO 16 bits expander
 #define DIR1 25      //moteur 1
 #define PWM1 26
 
-#define DIR2 27      //moteur 2 à vérifier les pins
-#define PWM2 28
+#define DIR2 32      //moteur 2 à vérifier les pins
+#define PWM2 33
 
 #define MOTEUR_ARRET 0 //Variable pour arreter le moteur
 #define MOTEUR_MONTE 1 //Variable pour ouvrir la serre
@@ -155,16 +154,22 @@ int current_result = 0;
 
 volatile float Temperature;
 
+
 //===============================================================================
 //------------------------ Fonctions gestion LEDs  ------------------------------
 //===============================================================================
 
 //-----------------------------------------------------
 /// @brief allume ou eteint la LED
-/// @param numero  numero associcié à pin de LED
+/// @param numero  numero associé à pin de LED
 /// @param etat true=allume, false=eteint
 void allumeLED(int numero, bool etat) {
   mcp.digitalWrite(numero, etat ? HIGH : LOW);
+}
+
+void activeVentilo(bool etat) {
+  mcp.digitalWrite(RELAIS_VENTILO, etat);
+  allumeLED(LED_MARCHE_VENTILO, etat);
 }
 
 unsigned long timestamp_LED = 0;
@@ -360,6 +365,60 @@ void loop_boutons() {
     Serial.print("Système redemarré : ");
     Serial.println(syst_on);
   }
+  if(syst_on) {
+    if(changeEtatBouton(BTN_MODE_VENTILO)) {
+      mode_ventilo_auto = lBoutons[BTN_MODE_VENTILO].etat;
+    }
+    if(changeEtatBouton(BTN_MODE_MOTEUR)) {       
+      mode_moteur_auto = lBoutons[BTN_MODE_MOTEUR].etat;
+    }
+    if(!mode_moteur_auto) {            //bloc allumé mode manuel
+      if(boutonPresse(BTN_PUSH_A_DESC)) {
+        if(lMoteurs[0].etat==MOTEUR_DESCEND) {    //moteur déjà en descente, on arrête la descente
+          arretMoteur(0);
+        }
+        else {
+          activeMoteur(0,MOTEUR_DESCEND);         //amorçage descente
+        }
+      }
+      if(boutonPresse(BTN_PUSH_A_MONT)) {
+        if(lMoteurs[0].etat==MOTEUR_MONTE) {
+          arretMoteur(0);
+        }
+        else {
+          activeMoteur(0,MOTEUR_MONTE);
+        }
+      }
+
+      if(boutonPresse(BTN_PUSH_B_DESC)) {
+        if(lMoteurs[1].etat==MOTEUR_DESCEND) {
+          arretMoteur(1);
+        }
+        else {
+          activeMoteur(1,MOTEUR_DESCEND);
+        }
+      }
+      if(boutonPresse(BTN_PUSH_B_MONT)) {
+        if(lMoteurs[1].etat==MOTEUR_MONTE) {
+          arretMoteur(1);
+        }
+        else {
+          activeMoteur(1,MOTEUR_MONTE);
+        }
+      }
+    }
+    if(!mode_ventilo_auto) {
+      if(changeEtatBouton(BTN_MARCHE_VENTILO)) {        //en mode manuel, active le ventilo en fonction du selecteur BTN_MARCHE_VENTILO
+
+        activeVentilo(lBoutons[BTN_MARCHE_VENTILO].etat);
+      }
+    }
+  }
+  else {
+    arretMoteur(0);
+    arretMoteur(1);
+    activeVentilo(LOW);
+  }
   // if(etatArretUrgence) {      //si déjà en arret urgence //TBD check si moteurs OFF ?
   //   syst_on = false;             //avant : syst_on = lBoutons[BTN_PUSH_ON].etat;
   //   allumeLED(LED_ON, syst_on);
@@ -374,47 +433,7 @@ void loop_boutons() {
   //   Serial.print("===================================================================================== etat systeme");
   //   Serial.println(syst_on);
   // }
-  if(changeEtatBouton(BTN_MODE_VENTILO)) {
-    mode_ventilo_auto = lBoutons[BTN_MODE_VENTILO].etat;
-  }
-  if(changeEtatBouton(BTN_MODE_MOTEUR)) {       
-    mode_moteur_auto = lBoutons[BTN_MODE_MOTEUR].etat;
-  }
-  if(!mode_moteur_auto && syst_on) {            //bloc allumé mode manuel
-    if(boutonPresse(BTN_PUSH_A_DESC)) {
-      if(lMoteurs[0].etat==MOTEUR_DESCEND) {    //moteur déjà en descente, on arrête la descente
-        arretMoteur(0);
-      }
-      else {
-        activeMoteur(0,MOTEUR_DESCEND);         //amorçage descente
-      }
-    }
-    if(boutonPresse(BTN_PUSH_A_MONT)) {
-      if(lMoteurs[0].etat==MOTEUR_MONTE) {
-        arretMoteur(0);
-      }
-      else {
-        activeMoteur(0,MOTEUR_MONTE);
-      }
-    }
-
-    if(boutonPresse(BTN_PUSH_B_DESC)) {
-      if(lMoteurs[1].etat==MOTEUR_DESCEND) {
-        arretMoteur(1);
-      }
-      else {
-        activeMoteur(1,MOTEUR_DESCEND);
-      }
-    }
-    if(boutonPresse(BTN_PUSH_B_MONT)) {
-      if(lMoteurs[1].etat==MOTEUR_MONTE) {
-        arretMoteur(1);
-      }
-      else {
-        activeMoteur(1,MOTEUR_MONTE);
-      }
-    }
-  }
+  
 }
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -661,7 +680,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 //===============================================================================
 void setup() {
   Serial.begin(115200);
-  
+  /*
   //============================= Partie MQTT ===================================
   WiFi.begin(ssid, password); //Connexion au WIFI
   thermo.begin(MAX31865_3WIRE);
@@ -694,6 +713,8 @@ void setup() {
       delay(2000);
     }
   }
+
+  */
   //=============================================================================
 
   //=================== Initialisation Expander MCP23S17 ========================
