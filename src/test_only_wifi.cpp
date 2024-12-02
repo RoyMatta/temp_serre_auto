@@ -222,7 +222,7 @@ void loop_LEDs() {
   if(etatErreurWifi) {
     check_LED(DUREE_WIFI_ON, DUREE_WIFI_OFF);
     Serial.print("Je suis ici ");
-    Serial.print("erreur wifi");
+    Serial.println("erreur wifi");
     return;
   } 
   //Si on a une erreur de connexion MQTT
@@ -588,8 +588,10 @@ void loop_check_reseau() {                                       //TBD : verifie
         Serial.println("================== Wifi connecte !==============");
       } 
     }                                
-    Serial.println("Test wifi passe");
-
+    else {
+      Serial.println("Test wifi passe");
+      etatErreurWifi = false;             // met a jour l'état d'erreur wifi peut importe l'etat du MQTT
+    }
     // Check MQTT connection
     if (!client.connected()) {
      if(!reconnectMQTT()){
@@ -602,7 +604,7 @@ void loop_check_reseau() {                                       //TBD : verifie
     } 
     Serial.println("Test MQTT passe");
     client.loop();                                //pas sûr d'ici
-    EnvoyerTemp();                                //envoie des données vers server
+    EnvoyerTemp();                            //envoie des données vers server
     EnvoyerHum();
     if(mode_moteur_auto) {
         rapport_ouverture = modeAutoMoteurs();       //donne int rapport d'ouverture positive ou negatif
@@ -621,7 +623,6 @@ void loop_check_reseau() {                                       //TBD : verifie
     }
   }
   else{
-    etatErreurWifi = false;
     etatErreurMQTT = false;
   }
 }
@@ -719,6 +720,8 @@ void setup() {
     //Connexion au MQTT
   client.setServer(mqttServer, mqttPort);
   client.setCallback(callback); // Set the callback function
+  thermo1.begin(MAX31865_3WIRE);
+  thermo2.begin(MAX31865_3WIRE);
   /*
   //============================= Partie MQTT ===================================
   WiFi.begin(ssid, password); //Connexion au WIFI
@@ -805,6 +808,8 @@ void setup() {
 }
 
 void loop() {
+  // Serial.print("Ici: ");
+  // Serial.println(Temperature1);
   loop_boutons();
   loop_check_reseau();
   loop_LEDs();
