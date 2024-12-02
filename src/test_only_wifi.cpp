@@ -610,8 +610,8 @@ void loop_check_reseau() {                                       //TBD : verifie
 //===============================================================================
 //---------------------------- Fonctions DEBUG  ---------------------------------
 //===============================================================================
-#define DebugGPIO 1;   //décommenter pour activer la lecture
-#define DebugCapteursFC 1;
+//#define DebugGPIO 1;   //décommenter pour activer la lecture
+//#define DebugCapteursFC 1;
 void debugGPIO() {
   for(int i=0; i<8; i++) {
     Serial.print("Etat de la pin : ");
@@ -777,9 +777,9 @@ void setup() {
 }
 
 void loop() {
-  // loop_boutons();
-  // loop_check_reseau();
-  // loop_LEDs();
+  loop_boutons();
+  loop_check_reseau();
+  loop_LEDs();
   // loop_moteurs();
   //TBD boucle envoyer param, timestamp
 
