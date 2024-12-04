@@ -20,10 +20,6 @@ L'ensemble du projet se veut Open-Source. Nous avons donc fait un effort pour co
 
 Le projet **Serre Automatisée Low-tech** vise à réguler les paramètres climatiques (notamment la température et l’humidité) dans une serre tunnel de maraîchage. Cette automatisation est assurée par la motorisation des ouvrants latéraux de la serre, permettant une gestion efficace et adaptée des conditions environnementales.
 
-### Qu’est-ce que la Low-tech ?
-
-La **Low-tech** désigne des systèmes développés selon des principes d’utilité, d’accessibilité et de durabilité. Ce projet intègre ces aspects pour permettre à des structures agricoles, quelle que soit leur taille, d’adapter les solutions à leurs besoins de manière abordable et durable.
-
 ### Synthèse du cahier des charges
 
 Le cahier des charges comprend les points suivants :
