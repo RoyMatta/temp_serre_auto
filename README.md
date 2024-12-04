@@ -9,9 +9,9 @@ L'ensemble du projet se veut Open-Source. Nous avons donc fait un effort pour co
 ## Sommaire du Projet de Serre Automatisée Low-Tech
 
 1. [**Présentation du projet**](#Présentation-du-projet)  
-2. [**Utilisation simple du projet et intégration directe**](##utilisation-simple-du-projet-et-intégration-directe)  
-3. [**Séquence de test et adaptation du code à vos besoin**](##séquence-de-test-et-adaptation-du-code-à-vos-besoin)  
-4. [**Installation des ressources nécessaires pour collaborer et profiter pleinement du projet**](##installation-des-ressources-nécessaires-pour-collaborer-et-profiter-pleinement-du-projet)  
+2. [**Utilisation simple du projet et intégration directe**](##Utilisation-simple-du-projet-et-intégration-directe)  
+3. [**Séquence de test et adaptation du code à vos besoin**](##Séquence-de-test-et-adaptation-du-code-à-vos-besoin)  
+4. [**Installation des ressources nécessaires pour collaborer et profiter pleinement du projet**](##Installation-des-ressources-nécessaires-pour-collaborer-et-profiter-pleinement-du-projet)  
 
 
 
