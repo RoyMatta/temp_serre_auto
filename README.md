@@ -5,39 +5,16 @@ L'ensemble du projet se veut Open-Source. Nous avons donc fait un effort pour co
 
 ![flyer Serre lowtech 3](https://github.com/user-attachments/assets/d717ed0a-61ce-4d45-95ff-c1d846fb41b2)
 
+
 ## Sommaire du Projet de Serre Automatisée Low-Tech
 
-1. **Introduction**  
-   - Présentation du projet  
-   - Qu’est-ce que la Low-tech ?  
+1. [**Présentation du projet**](#Présentation-du-projet)  
+2. [**Utilisation simple du projet et intégration directe**](##utilisation-simple-du-projet-et-intégration-directe)  
+3. [**Séquence de test et adaptation du code à vos besoin**](##séquence-de-test-et-adaptation-du-code-à-vos-besoin)  
+4. [**Installation des ressources nécessaires pour collaborer et profiter pleinement du projet**](##installation-des-ressources-nécessaires-pour-collaborer-et-profiter-pleinement-du-projet)  
 
-2. **Synthèse du Cahier des Charges**  
-   - Motorisation des ouvrants  
-   - Monitoring et régulation  
-   - Système informatisé  
-   - Ventilation  
-   - Surveillance du vent  
-   - Simplicité, fiabilité et sécurité  
 
-3. **Implémentation des Solutions**  
-   - Motorisation  
-   - Gestion informatisée  
-   - Microcontrôleurs  
-   - Composants de qualité  
-   - Alimentation énergétique  
 
-4. **Utilisation du Projet**  
-   - Copier et utiliser le code  
-   - Séquence de test et adaptation  
-
-5. **Installation des Ressources pour Collaboration**  
-   - Prérequis  
-   - Installation de VSCode  
-   - Installation de PlatformIO  
-   - Création d’un projet PlatformIO  
-   - Structure du projet PlatformIO  
-   - Premier code : Hello World  
-   - Importation d’un projet GitHub  
 
 ## Présentation du projet
 
@@ -77,11 +54,6 @@ Le projet repose sur une architecture générale simplifiée, présentée dans u
 - **Alimentation énergétique** :
   - Actuellement, le système est alimenté par le réseau EDF (230 V / 50 Hz).
   - Des travaux sont en cours pour permettre une alimentation autonome via des panneaux photovoltaïques, rendant le système adaptable à des exploitations non reliées au réseau électrique.
-
-
-
-
-
 
 
 
