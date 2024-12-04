@@ -70,10 +70,10 @@ L'ensemble des programmes de test se situent dans le dossier [test](https://gith
 L'électronique du boitier est détaillée dans le rapport d'étude ainsi que dans le fichier QElectrotec complet, publié sur ce Github.
 Sur la carte électronique, vous trouverez 2 LEDs ainsi que 2 boutons qui permettent de vérifier le bon fonctionnement des composants avant d'avoir branché l'ensemble de l'interface utilisateur sur le boitier.
 Vous devrez charger les codes de test depuis le dossier `\test` selon l'ordre suivant :
-1. [test_MCP](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_MCP)
-2. [test_humidity](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_humidity)
-3. [test_temp](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_temp)
-4. [test_moteur_AC](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_moteur_AC)
+1. [test_MCP](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_MCP) pour l'extandeur de ports. A utiliser sur la PCB puis lorsque les boutons/LEDs sont branchés
+2. [test_humidity](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_humidity) Capteur d'humidité branché
+3. [test_temp](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_temp) Les capteurs de température sont branchés avec les bonnes résistances
+4. [test_moteur_AC](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_moteur_AC) Pour moteur à courant alternatif. 
 5. [test_mqtt](https://github.com/RoyMatta/temp_serre_auto/tree/main/test/test_mqtt) (assurez-vous de modifier les champs `"adresse-routeur-wifi"` et `"mot-de-passe"`)
 
 6. Vous pourrez enfin charger le programme principal disponible dans `\src`.
