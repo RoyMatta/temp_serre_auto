@@ -5,6 +5,39 @@ L'ensemble du projet se veut Open-Source. Nous avons donc fait un effort pour co
 
 ![flyer Serre lowtech 3](https://github.com/user-attachments/assets/d717ed0a-61ce-4d45-95ff-c1d846fb41b2)
 
+## Sommaire du Projet de Serre Automatisée Low-Tech
+
+1. **Introduction**  
+   - Présentation du projet  
+   - Qu’est-ce que la Low-tech ?  
+
+2. **Synthèse du Cahier des Charges**  
+   - Motorisation des ouvrants  
+   - Monitoring et régulation  
+   - Système informatisé  
+   - Ventilation  
+   - Surveillance du vent  
+   - Simplicité, fiabilité et sécurité  
+
+3. **Implémentation des Solutions**  
+   - Motorisation  
+   - Gestion informatisée  
+   - Microcontrôleurs  
+   - Composants de qualité  
+   - Alimentation énergétique  
+
+4. **Utilisation du Projet**  
+   - Copier et utiliser le code  
+   - Séquence de test et adaptation  
+
+5. **Installation des Ressources pour Collaboration**  
+   - Prérequis  
+   - Installation de VSCode  
+   - Installation de PlatformIO  
+   - Création d’un projet PlatformIO  
+   - Structure du projet PlatformIO  
+   - Premier code : Hello World  
+   - Importation d’un projet GitHub  
 
 ## Présentation du projet
 
