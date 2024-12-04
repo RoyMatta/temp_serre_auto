@@ -1,9 +1,9 @@
 # Projet de serre automatisée Low-Tech
-![flyer Serre lowtech 3](https://github.com/user-attachments/assets/d717ed0a-61ce-4d45-95ff-c1d846fb41b2)
 
 Cette serre est réalisée dans le cadre d'un projet sur 2 ans par des étudiants en Mécatronique à l'INSA Strasbourg.
 L'ensemble du projet se veut Open-Source. Nous avons donc fait un effort pour commenter un maximum l'ensemble de nos livrables pour qu'ils soient utilisés sans modération. Vous pouvez à votre convenance l'adapter à vos propres besoins et publier vos modifications sur ce github.
 
+![flyer Serre lowtech 3](https://github.com/user-attachments/assets/d717ed0a-61ce-4d45-95ff-c1d846fb41b2)
 
 
 ## Présentation du projet
