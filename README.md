@@ -11,7 +11,7 @@ L'ensemble du projet se veut Open-Source. Nous avons donc fait un effort pour co
 1. [**Présentation du projet**](#Présentation-du-projet)  
 2. [**Utilisation simple du projet et intégration directe**](https://github.com/RoyMatta/temp_serre_auto/blob/main/README.md#utilisation-simple-du-projet-et-int%C3%A9gration-directe)  
 3. [**Séquence de test et adaptation du code à vos besoin**](#Séquence-de-test-et-adaptation-du-code-à-vos-besoin)  
-4. [**Installation des ressources nécessaires pour collaborer et profiter pleinement du projet**](#Installation-des-ressources-nécessaires-pour-collaborer-et-profiter-pleinement-du-projet)  
+4. [**Tuto d'installation de l'Environnement de travail**](#Installation-des-ressources-nécessaires-pour-collaborer-et-profiter-pleinement-du-projet)  
 
 
 
