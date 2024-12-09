@@ -780,7 +780,7 @@ void loop() {
   loop_boutons();
   loop_check_reseau();
   loop_LEDs();
-  // loop_moteurs();
+  loop_moteurs();
   //TBD boucle envoyer param, timestamp
 
   #ifdef DebugGPIO
