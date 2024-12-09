@@ -138,7 +138,8 @@ int ventilateur = 0; //valeur responsable de l'activation des ventilateurs
 
 //Pour le capteur de température
 // Use software SPI: CS, DI, DO, CLK
-Adafruit_MAX31865 thermo = Adafruit_MAX31865(5, 23, 19, 18);
+Adafruit_MAX31865 thermo1 = Adafruit_MAX31865(15, 23, 19, 18);
+Adafruit_MAX31865 thermo2 = Adafruit_MAX31865(2, 23, 19, 18);
 // use hardware SPI, just pass in the CS pin
 //Adafruit_MAX31865 max = Adafruit_MAX31865(10);
 
@@ -153,7 +154,14 @@ int16_t results[WINDOW_SIZE] = {0};
 int current_result = 0;
 
 volatile float Temperature;
+volatile float Temperature1;
+volatile float Temperature2;
+volatile float Moyenne_temp;
 
+//Capteurs humidité
+float voltage;
+float humidite;
+int sensorValue;
 
 //===============================================================================
 //------------------------ Fonctions gestion LEDs  ------------------------------
@@ -213,7 +221,8 @@ void loop_LEDs() {
   //Si on a une erreur de connexion Wifi
   if(etatErreurWifi) {
     check_LED(DUREE_WIFI_ON, DUREE_WIFI_OFF);
-    Serial.print("erreur wifi");
+    Serial.print("Je suis ici ");
+    Serial.println("erreur wifi");
     return;
   } 
   //Si on a une erreur de connexion MQTT
@@ -438,11 +447,22 @@ void loop_boutons() {
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //Capteur de temperature
 float LireTemp(){
+  int time = millis();
+  uint16_t rtd1 = thermo1.readRTD();
+  uint16_t rtd2 = thermo2.readRTD();
+
+  Temperature1 = (thermo1.temperature(RNOMINAL, RREF));
+  Temperature1 = (Temperature1 - 1.52); //correccion de temperatura
+  Temperature2 = (thermo2.temperature(RNOMINAL, RREF));
+  Temperature2 = (Temperature2 - 1.52); //correccion de temperatura
+  Moyenne_temp = (Temperature1+Temperature2)/2 ;
+  return Moyenne_temp;
+
 //  uint16_t rtd = thermo.readRTD();
 //   Temperature = (thermo.temperature(RNOMINAL, RREF));
 //   Temperature = (Temperature - 1.52);
-  Temperature = 24; //Forcer temp à 24 degrés
-  return Temperature; 
+  // Temperature = 24; //Forcer temp à 24 degrés
+  // return Temperature; 
 }
 
 void EnvoyerTemp(){
@@ -469,12 +489,16 @@ void EnvoyerTemp(){
 /// @brief mesure le potentiel: valeur d'humidité
 /// @return renvoie valeurCapteur, l'humidité en analogique (0 to 1024)
 float LireHum() {
-  valeurCapteur = 60; //Forcer l'humidité à 60
+  sensorValue = analogRead(humiditySensorPin);
+  voltage = (3.6/2100)*sensorValue;
+  humidite = 0.03892*voltage*1000-42.017 ;
+
+  //valeurCapteur = 60; //Forcer l'humidité à 60
   // Lecture de la valeur du capteur
   // valeurCapteur = analogRead(humiditySensorPin);
   // Serial.print("Valeur humidity : ");
   // Serial.println(valeurCapteur);
-  return valeurCapteur;
+  return humidite;
   // Ajout d'un léger délai pour éviter les lectures trop rapides
   //delay(1000);
 }
@@ -564,8 +588,10 @@ void loop_check_reseau() {                                       //TBD : verifie
         Serial.println("================== Wifi connecte !==============");
       } 
     }                                
-    Serial.println("Test wifi passe");
-
+    else {
+      Serial.println("Test wifi passe");
+      etatErreurWifi = false;             // met a jour l'état d'erreur wifi peut importe l'etat du MQTT
+    }
     // Check MQTT connection
     if (!client.connected()) {
      if(!reconnectMQTT()){
@@ -578,7 +604,7 @@ void loop_check_reseau() {                                       //TBD : verifie
     } 
     Serial.println("Test MQTT passe");
     client.loop();                                //pas sûr d'ici
-    EnvoyerTemp();                                //envoie des données vers server
+    EnvoyerTemp();                            //envoie des données vers server
     EnvoyerHum();
     if(mode_moteur_auto) {
         rapport_ouverture = modeAutoMoteurs();       //donne int rapport d'ouverture positive ou negatif
@@ -597,7 +623,6 @@ void loop_check_reseau() {                                       //TBD : verifie
     }
   }
   else{
-    etatErreurWifi = false;
     etatErreurMQTT = false;
   }
 }
@@ -691,6 +716,12 @@ void callback(char* topic, byte* payload, unsigned int length) {
 //===============================================================================
 void setup() {
   Serial.begin(115200);
+  WiFi.begin(ssid, password); //Connexion au WIFI
+    //Connexion au MQTT
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback); // Set the callback function
+  thermo1.begin(MAX31865_3WIRE);
+  thermo2.begin(MAX31865_3WIRE);
   /*
   //============================= Partie MQTT ===================================
   WiFi.begin(ssid, password); //Connexion au WIFI
@@ -777,6 +808,8 @@ void setup() {
 }
 
 void loop() {
+  // Serial.print("Ici: ");
+  // Serial.println(Temperature1);
   loop_boutons();
   loop_check_reseau();
   loop_LEDs();
