@@ -274,11 +274,13 @@ bool isMoteurActif(int numero) {
   return !(lMoteurs[numero].etat == MOTEUR_ARRET);
 }
 
+unsigned long duree_moteur = TIMEOUT_MOTEURS;
+bool to_stop = false;
 /// @brief désactive un moteur si un critère d'arret est vérifié : timeout, rapport d'ouverture si mode auto activé, capteur FC
 /// @param numero 
 void check_moteur(int numero) {   //TBD ajouter variation d'un timeout pour mode manu, ajouter argument timeout
-  bool to_stop = false;
-  unsigned long duree_moteur = TIMEOUT_MOTEURS;
+  to_stop = false;
+  duree_moteur = TIMEOUT_MOTEURS;
   if(mode_moteur_auto) {
     duree_moteur = 0.01*rapport_ouverture*duree_moteur;   ///ajuste duree ouvrant moteur selon pourcentage du rapport d'ouverture
   }
@@ -525,7 +527,7 @@ void EnvoyerHum(){
 //===============================================================================
 //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-/// @brief met à jour la valeur d'ouverture des volets
+/// @brief met à jour la valeur d'ouverture des volets (=0 si déjà valeur déjà reçue)
 /// @return coefficient d'ouverture, multiplié ensuite par un TIMEOUT
 int modeAutoMoteurs() {
   Serial.println("---MODE AUTOMATIQUE MOTEURS---");
@@ -607,16 +609,22 @@ void loop_check_reseau() {                                       //TBD : verifie
     EnvoyerTemp();                            //envoie des données vers server
     EnvoyerHum();
     if(mode_moteur_auto) {
-        rapport_ouverture = modeAutoMoteurs();       //donne int rapport d'ouverture positive ou negatif
-        if(rapport_ouverture>0) {                   //TBD changer de place ça dans loop_moteur
-            activeMoteur(0, MOTEUR_MONTE);         //TBD de vérifier le pourcentage d'ouverture des moteurs
-            activeMoteur(1, MOTEUR_MONTE);        //valeur d'arrêt  ajouter rapport_ouverture ds timeout
-        }
-        if(rapport_ouverture<0) {
-            activeMoteur(0, MOTEUR_DESCEND);
-            activeMoteur(1, MOTEUR_DESCEND);
-            rapport_ouverture = - rapport_ouverture;
-        }
+        int temp_rapport = modeAutoMoteurs();
+        if(temp_rapport !=0) {
+          rapport_ouverture = temp_rapport;   //màj des qu'une nouvelle valeur d'ouvrant est lancée.
+
+          if(rapport_ouverture>0) {                   //activation des moteurs dès que nouvelle valeur reçue (1 seule fois)
+            activeMoteur(0, MOTEUR_MONTE);            //TBD vérif pourçentage ouverture ca réel
+            activeMoteur(1, MOTEUR_MONTE);        
+          }
+          if(rapport_ouverture<0) {
+              activeMoteur(0, MOTEUR_DESCEND);
+              activeMoteur(1, MOTEUR_DESCEND);
+              rapport_ouverture = - rapport_ouverture;
+          }
+          }
+        //rapport_ouverture = modeAutoMoteurs();       //donne int rapport d'ouverture positive ou negatif
+
     }
     if(mode_ventilo_auto) {
         //TBD activation ou non tout ou rien
