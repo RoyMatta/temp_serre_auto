@@ -1,0 +1,43 @@
+#include <Adafruit_MAX31865.h>
+#include <SPI.h>
+#include <Wire.h>
+
+Adafruit_MAX31865 thermo1 = Adafruit_MAX31865(15, 23, 19, 18);
+Adafruit_MAX31865 thermo2 = Adafruit_MAX31865(2, 23, 19, 18);
+
+#define RREF 430.0
+#define RNOMINAL 100.0
+
+void setup() {
+    Serial.begin(115200);
+
+    pinMode(15, OUTPUT); 
+    pinMode(2, OUTPUT);
+
+    digitalWrite(15, HIGH);
+    digitalWrite(2, HIGH);
+
+    thermo1.begin(MAX31865_3WIRE);
+    thermo2.begin(MAX31865_3WIRE);
+}
+
+void loop() {
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
+    digitalWrite(15, LOW);
+    float temp1 = thermo1.temperature(RNOMINAL, RREF);
+    digitalWrite(15, HIGH);
+    SPI.endTransaction();
+
+    SPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE1));
+    digitalWrite(2, LOW);
+    float temp2 = thermo2.temperature(RNOMINAL, RREF);
+    digitalWrite(2, HIGH);
+    SPI.endTransaction();
+
+    Serial.print("Temperature 1: ");
+    Serial.println(temp1);
+    Serial.print("Temperature 2: ");
+    Serial.println(temp2);
+
+    delay(1000);
+}

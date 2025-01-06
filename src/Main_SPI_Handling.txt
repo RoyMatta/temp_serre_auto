@@ -77,6 +77,25 @@ Adafruit_MCP23X17 mcp;  //MCP23S17 = GPIO 16 bits expander
 
 unsigned long ANTIREBOND =30; //Variable pour l'anti-rebond
 
+void selectThermo1() {
+    digitalWrite(15, LOW);   // Enable thermo1
+    digitalWrite(2, HIGH);  // Disable thermo2
+    digitalWrite(5, HIGH);  // Disable MCP23S17
+}
+
+void selectThermo2() {
+    digitalWrite(2, LOW);   // Enable thermo2
+    digitalWrite(15, HIGH); // Disable thermo1
+    digitalWrite(5, HIGH);  // Disable MCP23S17
+}
+
+void selectMCP() {
+    digitalWrite(5, LOW);   // Enable MCP23S17
+    digitalWrite(15, HIGH); // Disable thermo1
+    digitalWrite(2, HIGH);  // Disable thermo2
+}
+
+
 //Définition de la structure du moteur
 typedef struct T_Moteur {
   int pwm;    //pin responsable du pwm
@@ -154,10 +173,10 @@ Adafruit_MAX31865 thermo2 = Adafruit_MAX31865(2, 23, 19, 18);
 int16_t results[WINDOW_SIZE] = {0};
 int current_result = 0;
 
-volatile float Temperature;
+//volatile float Temperature;
 volatile float Temperature1;
 volatile float Temperature2;
-volatile float Moyenne_temp;
+//volatile float Moyenne_temp;
 
 //Capteurs humidité
 float voltage;
@@ -173,11 +192,16 @@ int sensorValue;
 /// @param numero  numero associé à pin de LED
 /// @param etat true=allume, false=eteint
 void allumeLED(int numero, bool etat) {
+  SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0)); // Settings for MCP
   mcp.digitalWrite(numero, etat ? HIGH : LOW);
+  SPI.endTransaction();
+
 }
 
 void activeVentilo(bool etat) {
+  SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0)); // Settings for MCP
   mcp.digitalWrite(RELAIS_VENTILO, etat);
+  SPI.endTransaction();
   allumeLED(LED_MARCHE_VENTILO, etat);
 }
 
@@ -222,7 +246,6 @@ void loop_LEDs() {
   //Si on a une erreur de connexion Wifi
   if(etatErreurWifi) {
     check_LED(DUREE_WIFI_ON, DUREE_WIFI_OFF);
-
     Serial.println("erreur wifi");
     return;
   } 
@@ -317,7 +340,10 @@ bool changeEtatBouton(int numero) {
   if(numero == BTN_ArretUrgence) {
     etat = !digitalRead(lBoutons[numero].pin); //TBD vérifier si pull-up/down
   } else {
-    etat = !mcp.digitalRead(lBoutons[numero].pin); //TBD vérifier si pull-up/down
+    SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0)); // Settings for MCP
+    etat = !mcp.digitalRead(lBoutons[numero].pin);
+    SPI.endTransaction();
+    //TBD vérifier si pull-up/down
   }
   // Serial.print("ETAT MCP : ");
   // Serial.println(etat);
@@ -449,18 +475,33 @@ void loop_boutons() {
 
 //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 //Capteur de temperature
-float LireTemp(){
-  int time = millis();
-  uint16_t rtd1 = thermo1.readRTD();
-  uint16_t rtd2 = thermo2.readRTD();
+float LireTemp() {
+    SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE1));
+    selectThermo1();
+    Temperature1 = thermo1.temperature(RNOMINAL, RREF) - 1.52; // Temperature correction
+    digitalWrite(15, HIGH);  // Deselect thermo1
+    SPI.endTransaction();
 
-  Temperature1 = (thermo1.temperature(RNOMINAL, RREF));
-  Temperature1 = (Temperature1 - 1.52); //correccion de temperatura
-  Temperature2 = (thermo2.temperature(RNOMINAL, RREF));
-  Temperature2 = (Temperature2 - 1.52); //correccion de temperatura
-  //Moyenne_temp = (Temperature1+Temperature2)/2 ;
-  return Temperature1;
+    SPI.beginTransaction(SPISettings(500000, MSBFIRST, SPI_MODE1));
+    selectThermo2();
+    Temperature2 = thermo2.temperature(RNOMINAL, RREF) - 1.52; // Temperature correction
+    digitalWrite(2, HIGH);  // Deselect thermo2
+    SPI.endTransaction();
+
+    // Reactivate MCP after reading temperatures
+    SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0)); // Use correct settings for MCP
+    selectMCP(); // Activate MCP
+    SPI.endTransaction(); // End SPI transaction for MCP
+
+    Serial.print("Temperature 1: ");
+    Serial.println(Temperature1);
+    Serial.print("Temperature 2: ");
+    Serial.println(Temperature2);
+
+    return Temperature2;  // Example return value
 }
+
+
 
 void EnvoyerTemp(){
   float temperature = LireTemp();
@@ -644,7 +685,10 @@ void debugGPIO() {
     Serial.print(i);
     Serial.print(" --> ");
      // LOW = pressed, HIGH = not pressed
+    SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0)); // Settings for MCP
     Serial.println(!mcp.digitalRead(i));
+    SPI.endTransaction();
+   
   }
 }
 
@@ -717,12 +761,23 @@ void callback(char* topic, byte* payload, unsigned int length) {
 //===============================================================================
 void setup() {
   Serial.begin(115200);
+      // Initialize SPI
+    SPI.begin();
+  // Initialize CS pins
+    pinMode(15, OUTPUT);  // CS for thermo1
+    pinMode(2, OUTPUT);   // CS for thermo2
+    pinMode(5, OUTPUT);   // CS for MCP23S17
+
+    // Set all CS pins HIGH (inactive)
+    digitalWrite(15, HIGH);
+    digitalWrite(2, HIGH);
+    digitalWrite(5, HIGH);
+
   WiFi.begin(ssid, password); //Connexion au WIFI
     //Connexion au MQTT
   client.setServer(mqttServer, mqttPort);
   client.setCallback(callback); // Set the callback function
-  thermo1.begin(MAX31865_3WIRE);
-  thermo2.begin(MAX31865_3WIRE);
+  
   /*
   //============================= Partie MQTT ===================================
   WiFi.begin(ssid, password); //Connexion au WIFI
@@ -766,14 +821,22 @@ void setup() {
     Serial.println("Error mcp begin.");
     while (1);
   }
+  // Reset SPI after MCP initialization
+    SPI.end();
+    SPI.begin();
+
+  thermo1.begin(MAX31865_3WIRE);
+  thermo2.begin(MAX31865_3WIRE);
 
   // configure pin for output
   //mcp.pinMode(LED_PIN, OUTPUT);
   for (int i = 8; i<16; i++) {    //configure en sortie le registre B
+    SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0)); // Settings for MCP
     mcp.pinMode(i, OUTPUT);                                 //TBD correction
-    mcp.digitalWrite(i, HIGH);    //attention aux sorties MOTEURS ! (B2=10 et B3=11 ?)
-    delay(400);
-    mcp.digitalWrite(i, LOW);   
+    mcp.digitalWrite(i, HIGH); 
+    delay(400); 
+    mcp.digitalWrite(i, LOW);
+    SPI.endTransaction();
   }
 
   for(int i=0; i<8; i++) {
@@ -782,6 +845,9 @@ void setup() {
     Serial.print(i);
     Serial.print(" --> ");
      // LOW = pressed, HIGH = not pressed
+    SPI.beginTransaction(SPISettings(10000000, MSBFIRST, SPI_MODE0)); // Settings for MCP
+    Serial.println(!mcp.digitalRead(i));
+    SPI.endTransaction();
     Serial.println(!mcp.digitalRead(i));
   }
   //=============================================================================
@@ -809,10 +875,12 @@ void setup() {
 }
 
 void loop() {
-  loop_boutons();
-  loop_check_reseau();
-  loop_LEDs();
-  loop_moteurs();
+
+  // Serial.println(LireTemp());
+   loop_boutons();
+   loop_check_reseau();
+   loop_LEDs();
+   loop_moteurs();
   //TBD boucle envoyer param, timestamp
 
   #ifdef DebugGPIO
