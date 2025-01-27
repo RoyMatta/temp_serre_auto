@@ -75,7 +75,7 @@ Adafruit_MCP23X17 mcp;  //MCP23S17 = GPIO 16 bits expander
 #define MOTEUR_B_FC_BAS         14
 #define MOTEUR_B_FC_HAUT        27
 
-unsigned long ANTIREBOND =30; //Variable pour l'anti-rebond
+unsigned long TIMEOUT_MOTEURS = 3000; //Durée de fonctionnement d'un cycle du moteur
 
 //Définition de la structure du moteur
 typedef struct T_Moteur {
@@ -93,6 +93,8 @@ T_Moteur lMoteurs[]=
      { PWM1, DIR1, MOTEUR_ARRET, 0, MOTEUR_A_FC_HAUT, MOTEUR_A_FC_BAS, LED_MARCHE_MOT_A}, //Moteur 1
      { PWM2, DIR2, MOTEUR_ARRET, 0, MOTEUR_B_FC_HAUT, MOTEUR_B_FC_BAS, LED_MARCHE_MOT_B} //Moteur 2
   };
+
+unsigned long ANTIREBOND =30; //Variable pour l'anti-rebond
 
 //Définition de la structure du bouton
 typedef struct T_Bouton {
@@ -115,7 +117,6 @@ T_Bouton lBoutons[]=
     {false, false, PIN_BTN_ArretUrgence, 0},    //Bouton arret d'urgence //TBD correction
   }; 
 
-unsigned long TIMEOUT_MOTEURS = 3000; //Durée de fonctionnement d'un cycle du moteur
 
 bool syst_on = false; //booléen responsable de l'activation du système
 bool mode_manu = false; //booléen responsable de l'activation du mode manuel du système
@@ -151,7 +152,7 @@ Adafruit_MAX31865 thermo2 = Adafruit_MAX31865(2, 23, 19, 18);
 #define RNOMINAL  100.0
 
 #define WINDOW_SIZE 128
-int16_t results[WINDOW_SIZE] = {0};
+int16_t results[WINDOW_SIZE] = {0}; // TBD DELETE
 int current_result = 0;
 
 volatile float Temperature;
@@ -263,7 +264,7 @@ void activeMoteur(int numero, int etat) { //demarrage du moteur
   allumeLED(lMoteurs[numero].pin_LED_temoin, true);
   digitalWrite(lMoteurs[numero].pwm, HIGH); 
   lMoteurs[numero].timestamp = millis();
-  if(etat == MOTEUR_MONTE) {
+  if(etat == MOTEUR_MONTE) {   //TBD encore plus simple que les TBD suivant .dir !=etat
     digitalWrite(lMoteurs[numero].dir, LOW);    //TBD REMPLACER LOW par sens_montee et définir sens_montée
   } else {
     digitalWrite(lMoteurs[numero].dir, HIGH);   //TBD
@@ -447,8 +448,9 @@ void loop_boutons() {
   
 }
 
-//---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-//Capteur de temperature
+//===============================================================================
+//----------------------- Capteur de temperature ---------------------------
+//===============================================================================
 float LireTemp(){
   int time = millis();
   uint16_t rtd1 = thermo1.readRTD();
@@ -502,7 +504,7 @@ float LireHum() {
 void EnvoyerHum(){
   float humidite = LireHum();
     // Create a JSON object and populate it
-  StaticJsonDocument<200> doc;  // Adjust size according to your needs
+  StaticJsonDocument<200> doc;  // Adjust size according to your needs //TBD changer vers 20-30 (bytes) pour tsous les autres
   doc["humidity"] = humidite;
   
   // Generate the JSON string
