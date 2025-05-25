@@ -374,6 +374,13 @@ void loop() {
         }
     }
     EtatSysteme.syst_on = ILogic[7].etat_var; // Met à jour l'état du système en fonction du bouton ON/OFF
+    if (ILogic[8].etat_var) { // Si l'arrêt d'urgence est activé
+        EtatSysteme.syst_on = false; // Désactive le système
+        for (int i = 0; i < 3; i++) {
+            OMotorisation[i].etat = MOTEUR_ARRET; // Arrête tous les moteurs
+            updateOutput(i);
+        }
+    }
     updateStateOutput(); // Met à jour l'état des LEDs de défaut et de marche du système
     for (int i = 0; i < 4; i++) {
         outputAnalogRead(i); // Lit les capteurs analogiques
@@ -383,18 +390,11 @@ void loop() {
             sendDataToMQTT(i); // Envoie les données des capteurs analogiques
         }
     }
-    if (ILogic[8].etat_var) { // Si l'arrêt d'urgence est activé
-        EtatSysteme.syst_on = false; // Désactive le système
-        for (int i = 0; i < 3; i++) {
-            OMotorisation[i].etat = MOTEUR_ARRET; // Arrête tous les moteurs
-        }
-    }
 
     for (int i = 0; i < 4; i++) {
         OMotorisation[i].etat_precedent = OMotorisation[i].etat; // Met à jour l'état précédent des moteurs
     }
     if (EtatSysteme.syst_on) { // Si le système est activé
-
         if (ILogic[1].etat_var == MODE_MANU) { // Mode manuel pour le ventilateur
             OMotorisation[3].etat = (ILogic[0].etat_var) ? MOTEUR_MONTE : MOTEUR_ARRET; // Ventilateur
         }
