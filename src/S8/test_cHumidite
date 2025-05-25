@@ -1,0 +1,47 @@
+#include "config.h"
+#include <Arduino.h>
+#include <math.h>
+
+float A_RH_linear; 
+float B_RH_linear; 
+
+float A_RH_polynomial; 
+float B_RH_polynomial; 
+
+float mVToRHLin(int mV) { // Linear approximation of relative humidity (quick but less accurate)
+  return (0.03892*(3.6/2100)*mV) - 42.017;
+}
+
+float mVToRHPoly(int mV) { // Polynomial approximation of relative humidity (more accurate with calibration)
+  return -1.91e-9 * pow((3.6/2100)*mV, 3) + 1.33e-5 * pow((3.6/2100)*mV, 2) + 9.56e-3 * (3.6/2100)* mV - 2.16e1;
+}
+
+void setup() {
+  Serial.begin(115200);
+  
+  pinMode(humidity_A_pin, INPUT);
+  pinMode(humidity_B_pin, INPUT);
+  analogReadResolution(12);
+}
+
+void loop() {
+    A_RH_linear = mVToRHLin(analogReadMilliVolts(humidity_A_pin));
+    B_RH_linear = mVToRHLin(analogReadMilliVolts(humidity_B_pin)); 
+
+    A_RH_polynomial = mVToRHPoly(analogReadMilliVolts(humidity_A_pin));
+    B_RH_polynomial = mVToRHPoly(analogReadMilliVolts(humidity_B_pin));
+
+    Serial.print("Linear RH: A=");
+    Serial.print(A_RH_linear);
+    Serial.print(", B=");
+    Serial.println(B_RH_linear);
+
+    Serial.print("Polynomial RH: A=");
+    Serial.print(A_RH_linear);
+    Serial.print(", B=");
+    Serial.println(B_RH_polynomial);
+
+    Serial.println();
+
+    delay(1000);
+}

@@ -1,0 +1,26 @@
+#include <Arduino.h>
+#include "config.h"
+
+bool etatArretUrgence = false; //flag d'arrêt d'urgence
+
+void setup() {
+  Serial.begin(115200);
+  // Initialisation des pins
+  pinMode(BTN_ArretUrgence, INPUT);
+}
+
+void loop() {
+  // Vérification de l'état du bouton d'arrêt d'urgence
+  if (digitalRead(BTN_ArretUrgence) == LOW) {
+    Serial.println("Arret d'urgence activé");
+    // Ajoutez ici le code pour gérer l'arrêt d'urgence
+  } 
+  if (etatArretUrgence) {
+    Serial.println("Système arrêté");
+    // Ajoutez ici le code pour gérer l'état d'arrêt
+  }
+  else {
+    Serial.println("Système opérationnel");
+  }
+  delay(1000); // Attendre 1 seconde avant de vérifier à nouveau
+}

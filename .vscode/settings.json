@@ -2,6 +2,22 @@
     "C_Cpp.errorSquiggles": "disabled",
     "files.associations": {
         "*.tcc": "cpp",
-        "streambuf": "cpp"
+        "streambuf": "cpp",
+        "array": "cpp",
+        "deque": "cpp",
+        "string": "cpp",
+        "unordered_map": "cpp",
+        "unordered_set": "cpp",
+        "vector": "cpp",
+        "string_view": "cpp",
+        "initializer_list": "cpp",
+        "test_humidite": "cpp",
+        "test_outputstatetbd": "cpp",
+        "test_outputlogic": "cpp",
+        "main_spi_handling": "cpp",
+        "test_inputlogic_hatbd": "cpp",
+        "test_outputanalog": "cpp",
+        "test_inputboitier": "cpp",
+        "test_outputboitier": "cpp"
     }
 }

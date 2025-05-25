@@ -1,0 +1,80 @@
+#include "config.h"
+#include <Wire.h>
+#include <MCP23017.h>
+
+MCP23017 mcp = MCP23017(MCP23017_ADDR);
+
+
+void outputStateSetup(){
+    mcp.pinMode(EtatSysteme.defaut_pin, OUTPUT);
+    mcp.pinMode(EtatSysteme.syst_pin, OUTPUT); 
+}
+
+unsigned long timestamp_LEDDefaut = 0;
+bool etat_LEDDefaut = false;
+void blinking_LEDDefaut(int time_on, int time_off) {
+    if ((millis() > timestamp_LEDDefaut + time_off)&& !etat_LEDDefaut){
+        etat_LEDDefaut = false;
+        mcp.digitalWrite(EtatSysteme.defaut_pin, HIGH);
+        timestamp_LEDDefaut = millis();
+    } else if ((millis() > timestamp_LEDDefaut + time_on) && etat_LEDDefaut) {
+        etat_LEDDefaut = false;
+        mcp.digitalWrite(EtatSysteme.defaut_pin, LOW);
+        timestamp_LEDDefaut = millis();
+    }
+}
+
+void updateStateOutput() {
+    mcp.digitalWrite(EtatSysteme.syst_pin, EtatSysteme.syst_on);
+    if (ILogic[8].etat_var) { // Variable en charge de l'Arrêt d'Urgence
+        blinking_LEDDefaut(DUREE_URGENCE_ON, DUREE_URGENCE_OFF);
+    } else if (EtatSysteme.erreurWifi) {
+        blinking_LEDDefaut(DUREE_WIFI_ON, DUREE_WIFI_OFF);
+    } else if (EtatSysteme.erreurMQTT) {
+        blinking_LEDDefaut(DUREE_MQTT_ON, DUREE_MQTT_OFF);
+    }
+    else {
+        mcp.digitalWrite(EtatSysteme.defaut_pin, LOW); // Pas d'erreur
+        etat_LEDDefaut = false;
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+
+    Wire.begin(SDA_pin,SCL_pin);
+    mcp.init();
+
+    outputStateSetup();
+}
+
+int test_state = 0;
+void loop() {
+    test_state = (test_state + 1) % 5;
+    Serial.print("Etat : ");
+    EtatSysteme.syst_on = false;
+    EtatSysteme.erreurWifi = false;
+    EtatSysteme.erreurMQTT = false;
+    ILogic[8].etat_var = false;
+    if (test_state == 0) {
+        Serial.println("Système OFF");
+    } else if (test_state == 1) {
+        Serial.println("Système ON");
+        EtatSysteme.syst_on = true;
+    } else if (test_state == 2) {
+        Serial.println("Erreur WIFI");
+        EtatSysteme.syst_on = true;
+        EtatSysteme.erreurWifi = true;
+    }
+    else if (test_state == 3) {
+        Serial.println("Erreur MQTT");
+        EtatSysteme.syst_on = true;
+        EtatSysteme.erreurMQTT = true;
+    }
+    else if (test_state == 4) {
+        Serial.println("Arrêt d'Urgence");
+        ILogic[8].etat_var = true;
+    }
+    updateStateOutput();
+    delay(2000);
+}

@@ -1,0 +1,109 @@
+#include "config.h"
+#include <ArduinoJson.h>
+#include <PubSubClient.h>
+#include <WiFi.h>
+
+WiFiClient espClient; 
+PubSubClient client(espClient);
+
+int ouvrant = 0; // Variable pour stocker l'état de l'ouvrant
+void callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+  
+  // Conversion du message en chaine de caracteres
+  String message = "";
+  for (int i = 0; i < length; i++) {
+    message += (char)payload[i];
+  }
+  Serial.print("Message: ");
+  Serial.println(message);
+
+   
+  if (strcmp(topic, "/Moteurs/Serre1") == 0) { // Message pour les moteurs de la serre
+    //Conversion du message JSON en chaine de caracteres pour recuperer les valeurs.
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, message);
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
+    }
+    // recupère la valeur de "l'ouvrant"
+    ouvrant = doc["ouvrant"];
+    Serial.printf("Ouvrant lu ds callback = %d\n", ouvrant);
+  }
+
+  else if (strcmp(topic, "/Ventilateurs/Serre1") == 0) {
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, message);
+    if (error) {
+      Serial.print("deserializeJson() failed: ");
+      Serial.println(error.c_str());
+      return;
+    }
+    OMotorisation[3].etat = doc["ventilateur"]; 
+    Serial.printf("Ventilateur lu ds callback = %d\n", OMotorisation[3].etat);
+  }
+}
+
+void wirelessSetup(){
+    WiFi.begin(ssid, password); //Connexion au WIFI
+    client.setServer(mqttServer, mqttPort); //Connexion au MQTT
+    client.setCallback(callback); // Set the callback function
+    client.connect("ESP32Client", mqttUsername, mqttPassword);
+}
+
+unsigned long lastWifiConnexion = 0;
+bool reconnectWiFi() {
+  // Attempt to reconnect to WiFi
+  if ( millis() > lastWifiConnexion + TIMEOUT_MAX_CONNECTIONS) {  //retente si delai dépassé
+    Serial.println("Connecting to WiFi...");
+    WiFi.begin(ssid, password);
+    Serial.print(" trying wifi...");
+    lastWifiConnexion = millis();       
+      
+  }
+  return WiFi.status() == WL_CONNECTED;
+}
+
+unsigned long lastMQTTConnexion = 0;
+bool reconnectMQTT() {
+  if ( millis() > lastMQTTConnexion + TIMEOUT_MAX_CONNECTIONS) {  // Wait 5 seconds before retrying
+    // Loop until we're reconnected to MQTT
+    Serial.println("Connecting to MQTT...");
+    // Attempt to connect
+    if (client.connect("ESP32Client", mqttUsername, mqttPassword)) {
+      Serial.println("Connected to MQTT");
+      // Subscribe to the topic here again because the subscription is lost on disconnection
+      client.subscribe("/Moteurs/Serre1");
+      client.subscribe("/Ventilateurs/Serre1");
+    } else {
+      Serial.print("Failed to connect to MQTT, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+    }
+    lastMQTTConnexion = millis();       
+  }
+  return client.connected();
+}
+
+bool checkConnected() {
+    if (WiFi.status() != WL_CONNECTED) {
+        Serial.println("WiFi not connected");
+        EtatSysteme.erreurWifi = !reconnectWiFi();
+    }
+    if (!client.connected()) {
+        Serial.println("MQTT not connected");
+        EtatSysteme.erreurMQTT = !reconnectMQTT();
+    }
+    return ((!EtatSysteme.erreurWifi) && (!EtatSysteme.erreurMQTT));
+}
+
+void setup(){
+    wirelessSetup();
+}
+
+void loop(){
+  checkConnected();
+}

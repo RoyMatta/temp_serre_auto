@@ -576,15 +576,15 @@ int modeAutoMoteurs() {
 
 //Reconnection to WIFI:
 #define TIMEOUT_MAX_CONNECTIONS 5000
-unsigned long lastWifiConnexions = 0;
-unsigned long lastMQTTConnexions = 0;
+unsigned long lastWifiConnexion = 0;
+unsigned long lastMQTTConnexion = 0;
 bool reconnectWiFi() {
   // Attempt to reconnect to WiFi
-  if ( millis() > lastWifiConnexions + TIMEOUT_MAX_CONNECTIONS) {  //retente si delai dépassé
+  if ( millis() > lastWifiConnexion + TIMEOUT_MAX_CONNECTIONS) {  //retente si delai dépassé
     Serial.println("Connecting to WiFi...");
     WiFi.begin(ssid, password);
     Serial.print(" trying wifi...");
-    lastWifiConnexions = millis();       
+    lastWifiConnexion = millis();       
       
   }
   return WiFi.status() == WL_CONNECTED;
@@ -593,7 +593,7 @@ bool reconnectWiFi() {
 /// @brief Reconnection to MQTT ssi delai dépassé
 /// @return connecté au MQTT ?
 bool reconnectMQTT() {
-  if ( millis() > lastMQTTConnexions + TIMEOUT_MAX_CONNECTIONS) {  // Wait 5 seconds before retrying
+  if ( millis() > lastMQTTConnexion + TIMEOUT_MAX_CONNECTIONS) {  // Wait 5 seconds before retrying
     // Loop until we're reconnected to MQTT
     Serial.println("Connecting to MQTT...");
     // Attempt to connect
@@ -607,7 +607,7 @@ bool reconnectMQTT() {
       Serial.print(client.state());
       Serial.println(" try again in 5 seconds");
     }
-    lastMQTTConnexions = millis();       
+    lastMQTTConnexion = millis();       
   }
   return client.connected();
 }
@@ -778,7 +778,7 @@ void setup() {
   client.setServer(mqttServer, mqttPort);
   client.setCallback(callback); // Set the callback function
   
-  /*
+  
   //============================= Partie MQTT ===================================
   WiFi.begin(ssid, password); //Connexion au WIFI
   thermo.begin(MAX31865_3WIRE);
@@ -812,7 +812,7 @@ void setup() {
     }
   }
 
-  */
+  
   //=============================================================================
 
   //=================== Initialisation Expander MCP23S17 ========================

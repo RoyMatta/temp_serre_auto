@@ -1,0 +1,89 @@
+#include <SPI.h>
+#include <Adafruit_MCP23X17.h>  //SPI
+#include <Wire.h>
+
+// CHIP SELECT pour la communication SPI
+#define MODULE_MCP_CS    5  // Module d'entrées/sorties MCP23S17
+#define MCP23S17_ADDRESS 0 // Adresse du module MCP23S17
+Adafruit_MCP23X17 mcp;
+
+
+//Pin des sorties liées au MCP
+#define LED_TEST 0
+#define LED_ON 8
+#define LED_DEFAUT 9
+#define LED_MARCHE_MOT_A 10
+#define LED_MARCHE_MOT_B 11
+#define LED_MARCHE_VENTILO 12
+#define LIBRE_1 13
+#define LIBRE_2 14
+#define RELAIS_VENTILO 15
+
+//Pin des boutons liées au MCP
+#define BTN_MARCHE_VENTILO 0
+#define BTN_MODE_VENTILO 1
+#define BTN_PUSH_B_DESC 2
+#define BTN_PUSH_B_MONT 3
+#define BTN_PUSH_A_DESC 4
+#define BTN_PUSH_A_MONT 5
+#define BTN_MODE_MOTEUR 6 //6
+#define BTN_PUSH_ON 7     //7
+#define BTN_ArretUrgence  8                 //TBD correction
+#define PIN_BTN_ArretUrgence  22                    //TBD correction
+
+
+unsigned long ANTIREBOND =30; //Variable pour l'anti-rebond
+//Définition de la structure du bouton
+typedef struct T_Bouton {
+  bool etat; //etat du bouton actuel si actif ou pas à l'instant n
+  bool last_etat; //etat précedent du bouton à l'instant n-1
+  int pin; //pin du  bouton sur l'esp
+  unsigned long timestamp; //timestamp responsable de l'anti-rebond
+} T_Bouton;
+
+T_Bouton lBoutons[]=
+  {
+    {false, false, BTN_MARCHE_VENTILO, 0}, //Bouton de marche des ventilateurs
+    {false, false, BTN_MODE_VENTILO, 0}, //Bouton mode automatique ou manuel des ventilateurs
+    {false, false, BTN_PUSH_B_DESC, 0}, //Bouton de descente du moteur B
+    {false, false, BTN_PUSH_B_MONT, 0}, //Bouton de montée du moteur B
+    {false, false, BTN_PUSH_A_DESC, 0}, //Bouton de descente edu moteur A
+    {false, false, BTN_PUSH_A_MONT, 0}, //Bouton de montée du moteur A
+    {false, false, BTN_MODE_MOTEUR, 0}, //Bouton mode automatique ou manuel des moteurs
+    {false, false, BTN_PUSH_ON, 0}, //Bouton de système pour le mettre actif
+    {false, false, PIN_BTN_ArretUrgence, 0},    //Bouton arret d'urgence //TBD correction
+}; 
+
+void allumeLED(int numero, bool etat) {
+    mcp.digitalWrite(numero, etat ? HIGH : LOW);
+}
+
+
+void led_tests(){
+    Serial.println("Test des boutons et LEDs");
+    for(int i=0; i<8; i++) {
+        Serial.print("etat bouton : " + i); Serial.println(digitalRead(lBoutons[8].pin) ? LOW : HIGH);
+    }
+}
+
+void setup() {
+    Serial.begin(115200);
+    mcp.begin_SPI(5,18, 19, 23, 0); //SPI, CS, MISO, MOSI, SCK
+  
+    for (int i = 8; i<16; i++) {    //configure en sortie le registre B
+        mcp.pinMode(i, OUTPUT);                                 //TBD correction
+        mcp.digitalWrite(i, HIGH);    //attention aux sorties MOTEURS ! (B2=10 et B3=11 ?)
+        delay(400);
+    }
+    for (int i = 8; i<12; i++) {   
+        mcp.digitalWrite(i, LOW);   
+    }
+    for (int i = 0; i<8; i++) {    //configure en entrée le registre A
+        mcp.pinMode(i, INPUT);                               
+    }
+}
+
+void loop() {
+    led_tests();
+}
+

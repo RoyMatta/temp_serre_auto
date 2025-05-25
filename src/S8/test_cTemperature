@@ -1,0 +1,23 @@
+#include "config.h"
+#include <Adafruit_MAX31865.h>
+#include <SPI.h>
+
+Adafruit_MAX31865 thermo1 = Adafruit_MAX31865(MODULE_TEMP_A_CS, MOSI_pin, MISO_pin, CLK_pin);
+Adafruit_MAX31865 thermo2 = Adafruit_MAX31865(MODULE_TEMP_B_CS, MOSI_pin, MISO_pin, CLK_pin);
+
+void setup() {
+    Serial.begin(115200);
+    // Initialize SPI
+    thermo1.begin(MAX31865_3WIRE);
+    thermo2.begin(MAX31865_3WIRE);
+}
+
+void loop(){
+    float temp1 = thermo1.temperature(RNOMINAL, RREF);
+    float temp2 = thermo2.temperature(RNOMINAL, RREF);
+    Serial.print("Temperature 1: ");
+    Serial.println(temp1);
+    Serial.print("Temperature 2: ");
+    Serial.println(temp2);
+    delay(1000);
+}
