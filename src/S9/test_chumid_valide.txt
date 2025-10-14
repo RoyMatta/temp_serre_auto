@@ -1,0 +1,30 @@
+#include <Arduino.h>
+// Déclaration de la pin pour le capteur
+const int sensorPin = 35;
+
+void setup() {
+  // Initialisation de la communication série
+  Serial.begin(115200);
+}
+
+void loop() {
+  // Lire la valeur du capteur
+  int sensorValue = analogRead(sensorPin);
+
+  // Conversion de la valeur en un format compréhensible (ex: température en °C)
+  // Adaptez cette formule selon les spécifications du capteur
+  float voltage = (3.6/2100)*sensorValue;
+  float humidite = 0.03892*voltage*1000-42.017 ;
+  
+  // Afficher la valeur lue dans le moniteur série
+  Serial.print("val : ");
+  Serial.println(sensorValue);
+  Serial.print("volt : ");
+  Serial.println(voltage);
+  Serial.print("hum : ");
+  Serial.print(humidite);
+  Serial.println(" %");
+
+  // Attendre une seconde avant la prochaine lecture
+  delay(1000);
+}

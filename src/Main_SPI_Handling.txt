@@ -45,7 +45,7 @@ Adafruit_MCP23X17 mcp;  //MCP23S17 = GPIO 16 bits expander
 #define LED_MARCHE_VENTILO 12
 #define LIBRE_1 13
 #define LIBRE_2 14
-#define RELAIS_VENTILO 15
+#define RELAIS_VENTILO 15 //Pin du relais des ventilateurs à vérifier
 
 //Pin des boutons liées au MCP
 #define BTN_MARCHE_VENTILO 0

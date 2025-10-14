@@ -1,0 +1,192 @@
+#include <Adafruit_MCP23X17.h>  //SPI
+#include <Adafruit_MAX31865.h>  //PT100 température
+#include <Wire.h>
+#include <SPI.h>
+
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
+#include <Arduino.h>
+
+#define PWM1 26
+#define DIR1 25      
+
+#define MOTEUR_ARRET 0
+#define MOTEUR_MONTEE 1
+#define MOTEUR_DESCENTE 2
+
+// Pins SPI Communication
+#define MOSI_pin    23
+#define MISO_pin    19
+#define CLK_pin     18
+// Pins CS températureAmplificateur de sonde de température PT100 MAX31865
+#define MODULE_TEMP_A_CS  2
+#define MODULE_TEMP_B_CS  15
+// Variables température
+#define RREF      430.0 // The value of the reference resistor. Use 430.0 for PT100
+#define RNOMINAL  100.0 // The 'nominal' 0-degrees-C resistance of the sensor. Use 100.0 for PT100
+
+// Capteurs de fin de cours
+#define MOTEUR_A_FC_BAS         13 
+#define MOTEUR_A_FC_HAUT        12
+#define MOTEUR_B_FC_BAS         14
+#define MOTEUR_B_FC_HAUT        27
+
+//Capteurs humidité
+#define HUMIDITY_SENSOR_PIN_A 34  
+#define HUMIDITY_SENSOR_PIN_B 35    
+
+Adafruit_MAX31865 thermo1 = Adafruit_MAX31865(MODULE_TEMP_A_CS, MOSI_pin, MISO_pin, CLK_pin);
+Adafruit_MAX31865 thermo2 = Adafruit_MAX31865(MODULE_TEMP_B_CS, MOSI_pin, MISO_pin, CLK_pin);
+
+
+//Définition de la structure du moteur
+typedef struct T_Moteur {
+  int pwm;    //pin responsable du pwm
+  int dir;    //pin responsable de la direction du moteur
+  int etat;    //valuer qui indique l'état du moteur
+  unsigned long timestamp; //timestamp responsable de la durée de marche du moteur
+  int capteur_FC_haut;  //capteur de fin de course haut
+  int capteur_FC_bas;  //capteur de fin de course bas
+//   int pin_LED_temoin;  //Led qui indique l'état du moteur s'il est en marche ou arret
+} T_Moteur ;
+
+T_Moteur lMoteurs[]= 
+  {
+     { PWM1, DIR1, MOTEUR_ARRET, 0, MOTEUR_A_FC_HAUT, MOTEUR_A_FC_BAS}, //0, MOTEUR_A_FC_HAUT, MOTEUR_A_FC_BAS, LED_MARCHE_MOT_A}, //Moteur 1
+     { PWM1, DIR1, MOTEUR_ARRET, 0, MOTEUR_A_FC_HAUT, MOTEUR_A_FC_BAS}   //  { PWM2, DIR2, MOTEUR_ARRET} //0, MOTEUR_B_FC_HAUT, MOTEUR_B_FC_BAS, LED_MARCHE_MOT_B} //Moteur 2
+  };
+
+float readTemp(Adafruit_MAX31865& thermo1, Adafruit_MAX31865& thermo2);
+void arretMoteur(int numero);
+void monteeMoteur(int numero);
+void descenteMoteur(int numero);
+bool isMoteurActif(int numero);
+float readHumidity(int sensorPin);
+
+
+bool to_stop = false;
+/// @brief désactive un moteur si un critère d'arret est vérifié : timeout, rapport d'ouverture si mode auto activé, capteur FC
+/// @param numero 
+bool check_moteur(int numero) {   //TBD ajouter variation d'un timeout pour mode manu, ajouter argument timeout
+  to_stop = false;
+  if(lMoteurs[numero].etat == MOTEUR_MONTEE && !digitalRead(lMoteurs[numero].capteur_FC_haut)) { //TBD bool moteur FC capté
+    Serial.println("Fin de course haut atteinte, arrêt du moteur");
+    to_stop = true;
+  } 
+  if(lMoteurs[numero].etat == MOTEUR_DESCENTE && !digitalRead(lMoteurs[numero].capteur_FC_bas)) { //TBD bool moteur FC capté
+    Serial.println("Fin de course bas atteinte, arrêt du moteur");
+    to_stop = true;
+  } 
+  return to_stop;
+}
+
+void setup(){
+    Serial.begin(115200);
+    delay(1000);
+    Serial.println("Demarrage test moteur et température avec Fin de course");
+
+    // Initialize SPI 
+    thermo1.begin(MAX31865_3WIRE);
+    thermo2.begin(MAX31865_3WIRE);
+
+    pinMode(lMoteurs[0].capteur_FC_haut, INPUT_PULLUP);
+    pinMode(lMoteurs[0].capteur_FC_bas, INPUT_PULLUP);
+    // pinMode(lMoteurs[1].capteur_FC_haut, INPUT_PULLUP);
+    // pinMode(lMoteurs[1].capteur_FC_bas, INPUT_PULL
+    
+    pinMode(lMoteurs[0].pwm, OUTPUT);
+    pinMode(lMoteurs[0].dir, OUTPUT);
+    arretMoteur(0);
+}
+
+void loop(){
+    float temp = readTemp(thermo1, thermo2);
+    Serial.print("Température moyenne : ");
+    Serial.print(temp);
+    Serial.println(" °C");
+
+    // float humidite_A = readHumidity(HUMIDITY_SENSOR_PIN_A);
+    float humidite_B = readHumidity(HUMIDITY_SENSOR_PIN_B);
+    // float humidite = (humidite_A + humidite_B) / 2.0;
+    Serial.print("Humidité moyenne : ");
+    Serial.print(humidite_B);
+    Serial.println(" %");
+
+    // Motor logic with FC safety
+    if(temp < 27.0) {
+        Serial.println("Température basse, descente du moteur");
+        // Only descend if FC bas is NOT triggered
+        if (digitalRead(lMoteurs[0].capteur_FC_bas)) {
+            descenteMoteur(0);
+        } else {
+            arretMoteur(0);
+            Serial.println("FC bas activé, descente impossible.");
+        }
+    } else if(temp > 28.0) {
+        Serial.println("Température haute, montée du moteur");
+        // Only ascend if FC haut is NOT triggered
+        if (digitalRead(lMoteurs[0].capteur_FC_haut)) {
+            monteeMoteur(0);
+        } else {
+            arretMoteur(0);
+            Serial.println("FC haut activé, montée impossible.");
+        }
+    } else {
+        Serial.println("Température OK, arrêt du moteur");
+        arretMoteur(0);
+    }
+
+    // Print FC sensor states for debugging
+    Serial.print("Capteur FC haut : " );
+    Serial.println(digitalRead(lMoteurs[0].capteur_FC_haut));
+    Serial.print("Capteur FC bas : ");
+    Serial.println(digitalRead(lMoteurs[0].capteur_FC_bas));
+
+}
+
+float readTemp(Adafruit_MAX31865& thermo1, Adafruit_MAX31865& thermo2) {
+    float temp1 = thermo1.temperature(RNOMINAL, RREF);
+    float temp2 = thermo2.temperature(RNOMINAL, RREF);
+    return (temp1 + temp2) / 2.0;
+}
+
+float readHumidity(int sensorPin) {
+    int sensorValue = analogRead(sensorPin);
+    float voltage = (3.6/2100)*sensorValue;
+    float humidite = 0.03892*voltage*1000-42.017 ;
+    return humidite;
+}
+
+/// @brief arrete le moteur grâce à son numéro (0 ou 1)
+/// @param numero 
+void arretMoteur(int numero) {
+  if(lMoteurs[numero].etat == MOTEUR_ARRET) {
+    return;
+  }
+  digitalWrite(lMoteurs[numero].dir, LOW);
+  digitalWrite(lMoteurs[numero].pwm, LOW);
+  lMoteurs[numero].etat = MOTEUR_ARRET;
+}
+
+void monteeMoteur(int numero) { //demarrage du moteur
+  if(lMoteurs[numero].etat == MOTEUR_MONTEE) { //si déjà actif
+    return;
+  }
+  digitalWrite(lMoteurs[numero].pwm, HIGH);
+  digitalWrite(lMoteurs[numero].dir, LOW);    //TBD REMPLACER LOW par sens_montee et définir sens_montée
+  lMoteurs[numero].etat = MOTEUR_MONTEE;
+}
+
+void descenteMoteur(int numero) { //demarrage du moteur
+  if(lMoteurs[numero].etat == MOTEUR_DESCENTE) { //si déjà actif
+    return;
+  }
+  digitalWrite(lMoteurs[numero].pwm, HIGH);
+  digitalWrite(lMoteurs[numero].dir, HIGH);   //TBD
+  lMoteurs[numero].etat = MOTEUR_DESCENTE;
+}
+
+bool isMoteurActif(int numero) {
+  return !(lMoteurs[numero].etat == MOTEUR_ARRET);
+}

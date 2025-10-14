@@ -1,0 +1,20 @@
+#include <Arduino.h>
+
+// Capteurs de fin de cours
+#define MOTEUR_A_FC_BAS         13 
+#define MOTEUR_A_FC_HAUT        12
+#define MOTEUR_B_FC_BAS         14
+#define MOTEUR_B_FC_HAUT        27
+
+void setup() {
+    Serial.begin(115200);
+    pinMode(MOTEUR_A_FC_BAS, INPUT_PULLUP);
+    pinMode(MOTEUR_A_FC_HAUT, INPUT_PULLUP);
+    pinMode(MOTEUR_B_FC_BAS, INPUT_PULLUP);
+    pinMode(MOTEUR_B_FC_HAUT, INPUT_PULLUP);
+}
+
+void loop() {
+    Serial.println(digitalRead(MOTEUR_A_FC_BAS));
+    Serial.println(digitalRead(MOTEUR_A_FC_HAUT));
+}

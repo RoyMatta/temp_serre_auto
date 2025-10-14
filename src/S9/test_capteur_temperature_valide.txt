@@ -1,0 +1,34 @@
+#include <Adafruit_MAX31865.h>
+#include <SPI.h>
+
+// Pins SPI Communication
+#define MOSI_pin    23
+#define MISO_pin    19
+#define CLK_pin     18
+// Pins CS températureAmplificateur de sonde de température PT100 MAX31865
+#define MODULE_TEMP_A_CS  2
+#define MODULE_TEMP_B_CS  15
+// Variables température
+#define RREF      430.0 // The value of the reference resistor. Use 430.0 for PT100
+#define RNOMINAL  100.0 // The 'nominal' 0-degrees-C resistance of the sensor. Use 100.0 for PT100
+
+
+Adafruit_MAX31865 thermo1 = Adafruit_MAX31865(MODULE_TEMP_A_CS, MOSI_pin, MISO_pin, CLK_pin);
+Adafruit_MAX31865 thermo2 = Adafruit_MAX31865(MODULE_TEMP_B_CS, MOSI_pin, MISO_pin, CLK_pin);
+
+void setup() {
+    Serial.begin(115200);
+    // Initialize SPI
+    thermo1.begin(MAX31865_3WIRE);
+    thermo2.begin(MAX31865_3WIRE);
+}
+
+void loop(){
+    float temp1 = thermo1.temperature(RNOMINAL, RREF);
+    float temp2 = thermo2.temperature(RNOMINAL, RREF);
+    Serial.print("Temperature 1: ");
+    Serial.println(temp1);
+    Serial.print("Temperature 2: ");
+    Serial.println(temp2);
+    delay(1000);
+}
