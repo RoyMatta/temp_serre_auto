@@ -20,24 +20,25 @@ bool motorDescActive = false; // État actuel du moteur A
 
 
 //Pin des sorties liées au MCP
-#define LED_ON 0
-#define LED_DEFAUT 3
-#define LED_MARCHE_MOT_A 4
-#define LED_MARCHE_MOT_B 2
-#define LED_MARCHE_VENTILO 1
-#define Pin_Ventilo 6 //Pin reliée au relais du ventilo
+#define LED_ON 8
+#define LED_DEFAUT 11
+#define LED_MARCHE_MOT_A 12
+#define LED_MARCHE_MOT_B 10
+#define LED_MARCHE_VENTILO 9
+#define Pin_Ventilo 14 //Pin reliée au relais du ventilo
 // #define LIBRE_1 13
 // #define LIBRE_2 14
 
 //Pin des boutons liées au MCP
-#define BTN_MARCHE_VENTILO 8
-#define BTN_MODE_VENTILO 9
-#define BTN_PUSH_B_DESC 10
-#define BTN_PUSH_B_MONT 11
-#define BTN_PUSH_A_DESC 12
-#define BTN_PUSH_A_MONT 13
-#define BTN_MODE_MOTEUR 14 //6
-#define BTN_PUSH_ON 15     //7
+#define BTN_MARCHE_VENTILO 0
+#define BTN_MODE_VENTILO 1
+#define BTN_PUSH_B_DESC 2
+#define BTN_PUSH_B_MONT 3
+#define BTN_PUSH_A_DESC 4
+#define BTN_PUSH_A_MONT 5
+#define BTN_MODE_MOTEUR 6 //6
+#define BTN_PUSH_ON 7     //7
+// ESP32
 #define BTN_ArretUrgence  4
 
 bool emergencyStop = false;
