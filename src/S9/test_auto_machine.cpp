@@ -8,6 +8,17 @@
 #include <ArduinoJson.h>
 #include <Arduino.h>
 
+// Connexion WIFI
+const char* ssid = "iPhone";
+const char* password = "matthieuuhry";
+WiFiClient espClient;
+// Connexion MQTT
+const char* mqttServer = "172.20.10.7";
+const int mqttPort = 1883;
+const char* mqttUsername = "admin"; // Replace with your MQTT username
+const char* mqttPassword = "miq3"; // Replace with your MQTT password
+PubSubClient client(espClient); //Nous declarons l'esp comme un client du reseau MQTT
+
 #define DEBOUNCE_DELAY 50 // Délai de debounce en millisecondes
 
 unsigned long lastDebounceTimeMont = 0; // Dernier temps de changement d'état pour le bouton de montée
@@ -26,6 +37,7 @@ bool motorDescActive = false; // État actuel du moteur A
 #define LED_MARCHE_MOT_B 10
 #define LED_MARCHE_VENTILO 9
 #define Pin_Ventilo 14 //Pin reliée au relais du ventilo
+#define relais_secteur 15 //Pin reliée au relais du secteur
 // #define LIBRE_1 13
 // #define LIBRE_2 14
 
@@ -54,6 +66,8 @@ bool mode_manu_old = true;
 #define MOTEUR_ARRET 0
 #define MOTEUR_MONTEE 1
 #define MOTEUR_DESCENTE 2
+
+bool moteurs_Actifs[2] = {false, false};
 
 // Capteurs de fin de cours
 #define MOTEUR_A_FC_BAS         13 
@@ -116,6 +130,13 @@ unsigned long lastDebounceTimeOn = 0;
 bool lastButtonStateOn = HIGH;
 bool lastSystemOnState = false;
 
+// Variable pour gérer l'ouverture de la serre.
+int ouvrant[2] = {0, 0};
+int ancien_ouvrant[2] = {0, 0};
+// int ancien_ouvrant = 0;
+// int action_ouvrant = 0;
+// int difference = 0;
+
 float readTemp(Adafruit_MAX31865& thermo1, Adafruit_MAX31865& thermo2);
 void arretMoteur(int numero);
 void monteeMoteur(int numero);
@@ -127,18 +148,41 @@ bool mode_manu_ventilo();
 void allume_ventilo();
 void handleMotorButtons(int motorIndex, int btnMontPin, int btnDescPin);
 void handleSystemOnOFF();
+void callback(char* topic, byte* payload, unsigned int length);
+void reconnectWiFi();
+void reconnectMQTT();
+bool mode_manu_moteur();
+
 
 Adafruit_MCP23X17 mcp;
 
 void setup() {
 
     Serial.begin(115200);
+
+    // Setup WiFi
+    // WiFi.begin(ssid, password);
+    // reconnectWiFi();
+    // Serial.println("IP address: ");
+    // Serial.println(WiFi.localIP());
+
+    // // Setup MQTT
+    client.setServer(mqttServer, mqttPort);
+    client.setCallback(callback);
+    // reconnectMQTT();
+    Serial.println("Début code");
+
+    // Initialize I2C
     Wire.begin();
     mcp.begin_I2C(); // Default address 0
 
     // Initialize SPI 
     thermo1.begin(MAX31865_3WIRE);
     thermo2.begin(MAX31865_3WIRE);
+
+    // Relais secteur ON
+    mcp.pinMode(relais_secteur, OUTPUT);
+    mcp.digitalWrite(relais_secteur, HIGH); // Power ON the system
 
     mcp.pinMode(lMoteurs[0].pin_LED_temoin, OUTPUT);
     mcp.digitalWrite(lMoteurs[0].pin_LED_temoin, LOW); // LED off initially
@@ -184,9 +228,14 @@ void setup() {
 void loop(){
     temp = readTemp(thermo1, thermo2);
     humiditeA = readHumidity(HUMIDITY_SENSOR_PIN_A);
+    //testing the relais secteur
+    // mcp.digitalWrite(relais_secteur, HIGH); // Power ON the system
+    // Serial.println("Ici");
+    // delay(5000);
+    // mcp.digitalWrite(relais_secteur, LOW); // Power OFF the system
     // float humiditeB = readHumidity(HUMIDITY_SENSOR_PIN_B);
     // Serial.print("Température: "); Serial.print(temp); Serial.println(" °C");
-    Serial.print("Humidité A: "); Serial.print(humiditeA); Serial.println(" %");
+    // Serial.print("Humidite A: "); Serial.print(humiditeA); Serial.println(" %");
     // Serial.print("Humidité B: "); Serial.print(humiditeB); Serial.println(" %");
     // Emergency button is active LOW
     if (digitalRead(BTN_ArretUrgence) == LOW) {
@@ -196,35 +245,45 @@ void loop(){
     }
 
     if (emergencyStop) {
-        // Stop all motors immediately
-        arretMoteur(0);
-        arretMoteur(1);
-        mcp.digitalWrite(LED_MARCHE_MOT_A, LOW);
-        mcp.digitalWrite(LED_MARCHE_MOT_B, LOW);
-        mcp.digitalWrite(LED_MARCHE_VENTILO, LOW);
-        mcp.digitalWrite(Pin_Ventilo, LOW);
-        mcp.digitalWrite(LED_ON, LOW);
-        // Only LED_DEFAUT ON
-        mcp.digitalWrite(LED_DEFAUT, HIGH);
-        systemOn = false; // Force system off
+      // Stop all motors immediately
+      arretMoteur(0);
+      arretMoteur(1);
+      mcp.digitalWrite(LED_MARCHE_MOT_A, LOW);
+      mcp.digitalWrite(LED_MARCHE_MOT_B, LOW);
+      mcp.digitalWrite(LED_MARCHE_VENTILO, LOW);
+      mcp.digitalWrite(Pin_Ventilo, LOW);
+      mcp.digitalWrite(LED_ON, LOW);
+      // Only LED_DEFAUT ON
+      mcp.digitalWrite(LED_DEFAUT, HIGH);
+      systemOn = false; // Force system off
 
-        // Optionally print emergency message
-        Serial.println("EMERGENCY STOP ACTIVATED!");
-        return;
+      // Optionally print emergency message
+      Serial.println("EMERGENCY STOP ACTIVATED!");
+      return;
     } else {
         mcp.digitalWrite(LED_DEFAUT, LOW); // Turn off emergency LED when not in emergency
     }
 
     handleSystemOnOFF();
     if(systemOn) {
-        handleMotorButtons(0, BTN_PUSH_A_MONT, BTN_PUSH_A_DESC);
-        handleMotorButtons(1, BTN_PUSH_B_MONT, BTN_PUSH_B_DESC);
-        allume_ventilo();
+      if(!mode_manu_moteur()) {
+        if(WiFi.status() != WL_CONNECTED) {
+          reconnectWiFi();
+        }
+        if (!client.connected()) {
+        reconnectMQTT();
+        }
+        client.loop();
+      }
+      handleMotorButtons(0, BTN_PUSH_A_MONT, BTN_PUSH_A_DESC);
+      handleMotorButtons(1, BTN_PUSH_B_MONT, BTN_PUSH_B_DESC);
+      allume_ventilo();
+    
     } else {
-        arretMoteur(0);
-        arretMoteur(1);
-        mcp.digitalWrite(LED_MARCHE_VENTILO, LOW);
-        mcp.digitalWrite(Pin_Ventilo, LOW); // Ventilo off
+      arretMoteur(0);
+      arretMoteur(1);
+      mcp.digitalWrite(LED_MARCHE_VENTILO, LOW);
+      mcp.digitalWrite(Pin_Ventilo, LOW); // Ventilo off
     }
 }
 
@@ -340,30 +399,40 @@ void handleMotorButtons(int motorIdx, int btnMont, int btnDesc) {
     }
   } else {
     // Motor logic with FC safety
-    if(temp < 27.0) {
-        Serial.println("Température basse, descente du moteur");
-        // Only descend if FC bas is NOT triggered
-        if (digitalRead(lMoteurs[motorIdx].capteur_FC_bas)) {
-            descenteMoteur(motorIdx);
-        } else {
-            arretMoteur(motorIdx);
-            Serial.println("FC bas activé, descente impossible.");
-        }
-    } else if(temp > 28.0) {
-        Serial.println("Température haute, montée du moteur");
-        // Only ascend if FC haut is NOT triggered
-        if (digitalRead(lMoteurs[motorIdx].capteur_FC_haut)) {
-            monteeMoteur(motorIdx);
-        } else {
-            arretMoteur(motorIdx);
-            Serial.println("FC haut activé, montée impossible.");
-        }
-    } else {
-        Serial.println("Température OK, arrêt du moteur");
-        arretMoteur(motorIdx);
+    // descenteMoteur(motorIdx); // Default action
+    // Always check end-stops while the motor is running
+    if (lMoteurs[motorIdx].etat == MOTEUR_MONTEE && !digitalRead(lMoteurs[motorIdx].capteur_FC_haut)) {
+      arretMoteur(motorIdx);
+      Serial.println("FC haut atteint, arrêt du moteur.");
     }
- }
-}
+    if (lMoteurs[motorIdx].etat == MOTEUR_DESCENTE && !digitalRead(lMoteurs[motorIdx].capteur_FC_bas)) {
+      arretMoteur(motorIdx);
+      Serial.println("FC bas atteint, arrêt du moteur.");
+    }
+      if (ouvrant[motorIdx] != ancien_ouvrant[motorIdx]) {
+          arretMoteur(motorIdx);
+          delay(100);
+          if (ouvrant[motorIdx] == 0 ) {
+              if (digitalRead(lMoteurs[motorIdx].capteur_FC_bas)) {
+                  descenteMoteur(motorIdx);
+                  Serial.println("Descente moteur");
+              } else {
+                  Serial.println("FC bas activé, descente impossible.");
+                  arretMoteur(motorIdx);
+              }
+          } else if (ouvrant[motorIdx] == 100) {
+              if (digitalRead(lMoteurs[motorIdx].capteur_FC_haut)) {
+                  monteeMoteur(motorIdx);
+                  Serial.println("Montée moteur");
+              } else {
+                  Serial.println("FC haut activé, montée impossible.");
+                  arretMoteur(motorIdx);
+              }
+          }
+          ancien_ouvrant[motorIdx] = ouvrant[motorIdx];
+      }
+    }
+  }
 
 void handleSystemOnOFF() {
     bool readingOn = mcp.digitalRead(BTN_PUSH_ON);
@@ -378,12 +447,72 @@ void handleSystemOnOFF() {
 float readTemp(Adafruit_MAX31865& thermo1, Adafruit_MAX31865& thermo2) {
     float temp1 = thermo1.temperature(RNOMINAL, RREF);
     float temp2 = thermo2.temperature(RNOMINAL, RREF);
-    return (temp1 + temp2) / 2.0;
+    float temp = (temp1 + temp2) / 2.0;
+    StaticJsonDocument<200> doc;
+    doc["temperature"] = temp1; // Send temp1 for now 
+    char jsonBuffer[512];
+    serializeJson(doc, jsonBuffer);
+    client.publish("serre1", jsonBuffer);
+    return temp;
 }
 
 float readHumidity(int sensorPin) {
     int sensorValue = analogRead(sensorPin);
     float voltage = (3.6/2100)*sensorValue;
     float humidite = 0.03892*voltage*1000-42.017 ;
+    StaticJsonDocument<200> doc;
+    doc["humidity"] = humidite;
+    char jsonBuffer[512];
+    serializeJson(doc, jsonBuffer);
+    client.publish("serre1", jsonBuffer);
     return humidite;
+}
+//b7 pin relais
+void callback(char* topic, byte* payload, unsigned int length) {
+    Serial.print("Message arrived in topic: ");
+    Serial.println(topic);
+
+    String message = "";
+    for (int i = 0; i < length; i++) {
+        message += (char)payload[i];
+    }
+    Serial.println(message);
+
+    StaticJsonDocument<200> doc;
+    DeserializationError error = deserializeJson(doc, message);
+
+    if (error) {
+        Serial.print("deserializeJson() failed: ");
+        Serial.println(error.c_str());
+        return;
+    }
+
+    if (String(topic) == "/Moteurs/Serre1") {
+        ouvrant[0] = doc["ouvrant"];
+        ouvrant[1] = doc["ouvrant"];
+    }
+}
+
+void reconnectWiFi() {
+    while (WiFi.status() != WL_CONNECTED) {
+        Serial.print("Connecting to WiFi...");
+        WiFi.begin(ssid, password);
+        delay(5000);
+    }
+    Serial.println("Connected to WiFi");
+}
+
+void reconnectMQTT() {
+    while (!client.connected()) {
+        Serial.print("Connecting to MQTT...");
+        if (client.connect("ESP32Client", mqttUsername, mqttPassword )) {
+            Serial.println("Connected to MQTT");
+            client.subscribe("/Moteurs/Serre1");
+        } else {
+            Serial.print("failed, rc=");
+            Serial.print(client.state());
+            Serial.println(" try again in 5 seconds");
+            delay(5000);
+        }
+    }
 }
